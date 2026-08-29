@@ -1,6 +1,7 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
+import { arSA } from '@clerk/localizations';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { getGetProgressQueryKey, useGetProgress, useSaveProgress, type ProgressInput } from '@workspace/api-client-react';
@@ -88,6 +89,235 @@ type EditableWord = {
 
 type WordOverrides = Partial<Omit<EditableWord, 'id'>>;
 type AppView = 'study' | 'browse' | 'all-days';
+type Language = 'en' | 'ar';
+
+const translations = {
+  en: {
+    languageButton: 'العربية',
+    languageButtonLabel: 'Switch to Arabic',
+    closeMenu: 'Close menu',
+    mainNavigation: 'Main navigation',
+    yourDesk: 'Your desk',
+    dailyRhythm: 'Daily rhythm',
+    dailyRhythmComplete: 'Daily rhythm complete. Beautiful work.',
+    dailyWordsLeft: (count: number) => `${count} ${count === 1 ? 'word' : 'words'} left in today’s rhythm.`,
+    resetSession: 'Reset session',
+    builtForLongGame: 'Built for the long game',
+    study: 'Study',
+    browse: 'Browse',
+    allDays: 'All Days',
+    login: 'Log in',
+    signUp: 'Sign up',
+    logout: 'Log out',
+    syncedAccount: 'Synced account',
+    loadingAccount: 'Loading account',
+    currentStreak: 'Current streak',
+    day: 'day',
+    days: 'days',
+    keepGoing: 'keep going',
+    startToday: 'start today',
+    wordsMet: 'Words met',
+    wordsOfGoal: 'of 3,000 in your goal',
+    inThisView: 'In this view',
+    matchingFilters: 'matching your filters',
+    dailyWordsSession: "words in today's session",
+    nextMilestone: 'Next milestone',
+    complete: 'Complete',
+    oxfordFinished: 'Oxford 3000 finished',
+    wordsToGo: 'words to go',
+    learningDesk: 'Your learning desk',
+    betterEnglish: 'better English.',
+    everyWordHasAPlace: 'Every word has a',
+    place: 'place.',
+    studyDescription: 'A calm, focused practice for Arabic speakers. Meet a word, meet it again, then make it yours.',
+    browseDescription: 'Search the Oxford 3000 by meaning, level, or part of speech. Your next useful word is nearby.',
+    focusedPractice: 'Focused practice',
+    oneWordAtTime: 'One word at a time.',
+    shuffle: 'Shuffle',
+    card: 'Card',
+    edit: 'Edit',
+    editThisCard: 'Edit this card',
+    englishWord: 'English word',
+    partOfSpeech: 'Part of speech',
+    cefrLevel: 'CEFR level',
+    arabicTranslation: 'Arabic translation',
+    englishExample: 'English example',
+    arabicExampleTranslation: 'Arabic example translation',
+    cancel: 'Cancel',
+    saveChanges: 'Save changes',
+    exampleSentence: 'the example sentence',
+    tapToReveal: 'Tap to reveal',
+    previous: 'Previous',
+    inYourRhythm: 'In your rhythm',
+    iKnowThis: 'I know this',
+    nextWord: 'Next word',
+    searchEnglishArabic: 'Search English or Arabic',
+    clearSearch: 'Clear search',
+    allLevels: 'All levels',
+    allParts: 'All parts',
+    resultCount: (count: number) => `${count} ${count === 1 ? 'word' : 'words'} in view`,
+    theWholeShelf: 'The whole shelf',
+    browseLibrary: 'Browse the library.',
+    selectWordToStudy: 'Select a word to study it',
+    noWordsMatch: 'No words match that search.',
+    tryDifferentSearch: 'Try a different spelling, level, or part of speech.',
+    noWordToStudy: 'No word to study yet.',
+    keyboardHint: 'to reveal',
+    keyboardMove: 'to move',
+    yourGoal: 'Your 3,000 goal',
+    smallShelf: 'A small, steady shelf becomes fluency.',
+    levelMap: 'Level map',
+    words: 'Words',
+    exploreAllWords: 'Explore all words',
+    studyNote: 'Study note',
+    quote: '“See the word in a sentence. That is where it starts to belong to you.”',
+    steadyPath: 'A steady path through every word',
+    allDaysTitle: 'All days, one',
+    steadyRhythm: 'steady rhythm.',
+    vocabularyJourney: 'Your complete vocabulary journey, arranged in focused daily sets of twelve words.',
+    dailyMap: 'Your daily map',
+    dailySet: 'Daily set',
+    dayLabel: (day: number) => `Day ${day}`,
+    wordsCount: (count: number) => `${count} ${count === 1 ? 'word' : 'words'}`,
+    to: 'to',
+    dailyVocabularySet: 'Daily vocabulary set',
+    today: 'Today',
+    reviewed: 'reviewed',
+    progress: 'Progress',
+    allDaysBack: 'All Days',
+    audio: 'Audio',
+    playPronunciation: (label: string, shortLabel: string) => `Play ${label} in ${shortLabel} English`,
+    pronunciationUnavailable: 'Speech playback is unavailable in this browser',
+  },
+  ar: {
+    languageButton: 'English',
+    languageButtonLabel: 'التبديل إلى الإنجليزية',
+    closeMenu: 'إغلاق القائمة',
+    mainNavigation: 'التنقل الرئيسي',
+    yourDesk: 'مساحتك',
+    dailyRhythm: 'إيقاعك اليومي',
+    dailyRhythmComplete: 'اكتمل إيقاعك اليومي. عمل رائع.',
+    dailyWordsLeft: (count: number) => `${count} ${count === 1 ? 'كلمة متبقية' : 'كلمات متبقية'} في إيقاع اليوم.`,
+    resetSession: 'إعادة ضبط الجلسة',
+    builtForLongGame: 'مصمم للتعلّم المستمر',
+    study: 'دراسة',
+    browse: 'تصفّح',
+    allDays: 'كل الأيام',
+    login: 'تسجيل الدخول',
+    signUp: 'إنشاء حساب',
+    logout: 'تسجيل الخروج',
+    syncedAccount: 'حساب متزامن',
+    loadingAccount: 'جارٍ تحميل الحساب',
+    currentStreak: 'السلسلة الحالية',
+    day: 'يوم',
+    days: 'أيام',
+    keepGoing: 'واصل التقدم',
+    startToday: 'ابدأ اليوم',
+    wordsMet: 'كلمات تعلّمتها',
+    wordsOfGoal: 'من أصل 3,000 كلمة في هدفك',
+    inThisView: 'في هذا العرض',
+    matchingFilters: 'كلمة مطابقة للتصفية',
+    dailyWordsSession: 'كلمة في جلسة اليوم',
+    nextMilestone: 'المحطة القادمة',
+    complete: 'مكتمل',
+    oxfordFinished: 'اكتملت قائمة أكسفورد 3000',
+    wordsToGo: 'كلمة متبقية',
+    learningDesk: 'مساحتك التعليمية',
+    betterEnglish: 'إنجليزية أفضل.',
+    everyWordHasAPlace: 'لكل كلمة',
+    place: 'مكان.',
+    studyDescription: 'تعلّم هادئ ومركّز للناطقين بالعربية. تعرّف إلى الكلمة، ثم قابلها مجددًا واجعلها جزءًا منك.',
+    browseDescription: 'ابحث في قائمة أكسفورد 3000 حسب المعنى أو المستوى أو نوع الكلمة. كلمتك المفيدة التالية قريبة منك.',
+    focusedPractice: 'تدريب مركّز',
+    oneWordAtTime: 'كلمة واحدة في كل مرة.',
+    shuffle: 'خلط',
+    card: 'بطاقة',
+    edit: 'تعديل',
+    editThisCard: 'تعديل هذه البطاقة',
+    englishWord: 'الكلمة الإنجليزية',
+    partOfSpeech: 'نوع الكلمة',
+    cefrLevel: 'مستوى CEFR',
+    arabicTranslation: 'الترجمة العربية',
+    englishExample: 'مثال بالإنجليزية',
+    arabicExampleTranslation: 'ترجمة المثال بالعربية',
+    cancel: 'إلغاء',
+    saveChanges: 'حفظ التغييرات',
+    exampleSentence: 'جملة المثال',
+    tapToReveal: 'اضغط لإظهار المعنى',
+    previous: 'السابق',
+    inYourRhythm: 'ضمن إيقاعك',
+    iKnowThis: 'أعرف هذه الكلمة',
+    nextWord: 'الكلمة التالية',
+    searchEnglishArabic: 'ابحث بالإنجليزية أو العربية',
+    clearSearch: 'مسح البحث',
+    allLevels: 'كل المستويات',
+    allParts: 'كل الأنواع',
+    resultCount: (count: number) => `${count} ${count === 1 ? 'كلمة' : 'كلمات'} في العرض`,
+    theWholeShelf: 'كل المجموعة',
+    browseLibrary: 'تصفّح المكتبة.',
+    selectWordToStudy: 'اختر كلمة لدراستها',
+    noWordsMatch: 'لا توجد كلمات تطابق هذا البحث.',
+    tryDifferentSearch: 'جرّب تهجئة أو مستوى أو نوع كلمة مختلفًا.',
+    noWordToStudy: 'لا توجد كلمة للدراسة بعد.',
+    keyboardHint: 'لإظهار المعنى',
+    keyboardMove: 'للتنقل',
+    yourGoal: 'هدفك: 3,000 كلمة',
+    smallShelf: 'مجموعة صغيرة وثابتة تقودك إلى الطلاقة.',
+    levelMap: 'خريطة المستويات',
+    words: 'كلمات',
+    exploreAllWords: 'استكشف كل الكلمات',
+    studyNote: 'ملاحظة دراسية',
+    quote: '«شاهد الكلمة في جملة؛ هناك تبدأ في الانتماء إليك.»',
+    steadyPath: 'طريق ثابت عبر كل كلمة',
+    allDaysTitle: 'كل الأيام،',
+    steadyRhythm: 'إيقاع ثابت.',
+    vocabularyJourney: 'رحلتك الكاملة مع المفردات، مرتبة في مجموعات يومية مركّزة من اثنتي عشرة كلمة.',
+    dailyMap: 'خريطتك اليومية',
+    dailySet: 'مجموعة يومية',
+    dayLabel: (day: number) => `اليوم ${day}`,
+    wordsCount: (count: number) => `${count} ${count === 1 ? 'كلمة' : 'كلمات'}`,
+    to: 'إلى',
+    dailyVocabularySet: 'مجموعة المفردات اليومية',
+    today: 'اليوم',
+    reviewed: 'تمت مراجعتها',
+    progress: 'التقدم',
+    allDaysBack: 'كل الأيام',
+    audio: 'صوت',
+    playPronunciation: (label: string, shortLabel: string) => `تشغيل نطق ${label} بلهجة ${shortLabel}`,
+    pronunciationUnavailable: 'تشغيل النطق غير متاح في هذا المتصفح',
+  },
+} as const;
+
+type TranslationSet = (typeof translations)[Language];
+type LanguageContextValue = { language: Language; setLanguage: (language: Language) => void; t: TranslationSet };
+const LanguageContext = createContext<LanguageContextValue | null>(null);
+
+function useLanguage() {
+  const context = useContext(LanguageContext);
+  if (!context) throw new Error('useLanguage must be used inside LanguageContext.Provider');
+  return context;
+}
+
+const partOfSpeechTranslations: Record<string, { en: string; ar: string }> = {
+  Noun: { en: 'Noun', ar: 'اسم' },
+  Verb: { en: 'Verb', ar: 'فعل' },
+  Adjective: { en: 'Adjective', ar: 'صفة' },
+  Adverb: { en: 'Adverb', ar: 'حال' },
+  Preposition: { en: 'Preposition', ar: 'حرف جر' },
+  Article: { en: 'Article', ar: 'أداة' },
+  Conjunction: { en: 'Conjunction', ar: 'حرف عطف' },
+  Determiner: { en: 'Determiner', ar: 'محدِّد' },
+  Exclamation: { en: 'Exclamation', ar: 'تعجب' },
+  'Modal verb': { en: 'Modal verb', ar: 'فعل ناقص' },
+  Number: { en: 'Number', ar: 'عدد' },
+  Pronoun: { en: 'Pronoun', ar: 'ضمير' },
+  'Auxiliary verb': { en: 'Auxiliary verb', ar: 'فعل مساعد' },
+  'Infinitive marker': { en: 'Infinitive marker', ar: 'علامة المصدر' },
+};
+
+function displayPartOfSpeech(value: string, language: Language) {
+  return value.split(' / ').map((part) => partOfSpeechTranslations[part]?.[language] ?? part).join(language === 'ar' ? ' / ' : ' / ');
+}
 
 const sourceWords: EditableWord[] = oxford3000.map((word) => ({ ...word }));
 const wordsPerDay = 12;
@@ -186,31 +416,32 @@ function Logo() {
 }
 
 function Sidebar({ view, setView, mobileOpen, closeMobile, onReset, reviewedToday }: { view: AppView; setView: (view: AppView) => void; mobileOpen: boolean; closeMobile: () => void; onReset: () => void; reviewedToday: number }) {
+  const { language, t } = useLanguage();
   const nav = [
-    { id: 'study' as const, label: 'Study room', arabic: 'غرفة الدراسة', icon: Sparkles },
-    { id: 'all-days' as const, label: 'All Days', arabic: 'جميع الأيام', icon: CalendarDays },
-    { id: 'browse' as const, label: 'Word library', arabic: 'مكتبة الكلمات', icon: Layers3 },
+    { id: 'study' as const, label: language === 'ar' ? 'غرفة الدراسة' : 'Study room', subtitle: 'غرفة الدراسة', icon: Sparkles },
+    { id: 'all-days' as const, label: t.allDays, subtitle: 'جميع الأيام', icon: CalendarDays },
+    { id: 'browse' as const, label: language === 'ar' ? 'مكتبة الكلمات' : 'Word library', subtitle: 'مكتبة الكلمات', icon: Layers3 },
   ];
   return (
     <>
-      {mobileOpen && <button type="button" aria-label="Close menu" data-testid="button-close-menu" onClick={closeMobile} className="fixed inset-0 z-30 bg-[#202a40]/35 md:hidden" />}
-      <aside className={`fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col bg-[#202a40] px-5 py-6 text-[#f9f5e9] transition-transform duration-300 md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      {mobileOpen && <button type="button" aria-label={t.closeMenu} data-testid="button-close-menu" onClick={closeMobile} className="fixed inset-0 z-30 bg-[#202a40]/35 md:hidden" />}
+      <aside className={`app-sidebar fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col bg-[#202a40] px-5 py-6 text-[#f9f5e9] transition-transform duration-300 md:translate-x-0 ${mobileOpen ? 'is-open translate-x-0' : '-translate-x-full'}`}>
         <Logo />
         <div className="mt-14">
-          <div className="mb-3 px-3 font-mono-custom text-[9px] uppercase tracking-[0.2em] text-[#84909f]">Your desk</div>
-          <nav className="space-y-1" aria-label="Main navigation">
-            {nav.map(({ id, label, arabic, icon: Icon }) => (
+          <div className="mb-3 px-3 font-mono-custom text-[9px] uppercase tracking-[0.2em] text-[#84909f]">{t.yourDesk}</div>
+          <nav className="space-y-1" aria-label={t.mainNavigation}>
+            {nav.map(({ id, label, subtitle, icon: Icon }) => (
               <button
                 key={id}
                 type="button"
                 data-testid={`button-nav-${id}`}
                 onClick={() => { setView(id); closeMobile(); }}
-                className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200 ${view === id ? 'bg-[#f3d24f] text-[#202a40] shadow-[3px_3px_0_#a89236]' : 'text-[#c2c8ce] hover:bg-[#2c3852] hover:text-[#f9f5e9]'}`}
+                className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 transition-all duration-200 ${language === 'ar' ? 'text-right' : 'text-left'} ${view === id ? 'bg-[#f3d24f] text-[#202a40] shadow-[3px_3px_0_#a89236]' : 'text-[#c2c8ce] hover:bg-[#2c3852] hover:text-[#f9f5e9]'}`}
               >
                 <Icon size={17} strokeWidth={view === id ? 2.5 : 1.8} />
                 <span className="flex-1">
                   <span className="block text-sm font-semibold">{label}</span>
-                  <span className={`font-arabic block text-[10px] ${view === id ? 'text-[#5b562e]' : 'text-[#7f8994]'}`} dir="rtl">{arabic}</span>
+                  <span className={`font-arabic block text-[10px] ${view === id ? 'text-[#5b562e]' : 'text-[#7f8994]'}`} dir="rtl">{subtitle}</span>
                 </span>
                 {view === id && <span className="h-1.5 w-1.5 rounded-full bg-[#ef7657]" />}
               </button>
@@ -219,18 +450,18 @@ function Sidebar({ view, setView, mobileOpen, closeMobile, onReset, reviewedToda
         </div>
         <div className="mt-auto rounded-2xl border border-[#3a465e] bg-[#29354e] p-4">
           <div className="flex items-center justify-between">
-             <span className="font-mono-custom text-[10px] uppercase tracking-[0.15em] text-[#9da8b3]">Daily rhythm</span>
+             <span className="font-mono-custom text-[10px] uppercase tracking-[0.15em] text-[#9da8b3]">{t.dailyRhythm}</span>
              <span className="text-[11px] font-semibold text-[#f3d24f]">{Math.min(reviewedToday, dailyGoal)} / {dailyGoal}</span>
           </div>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#1d273a]">
              <div className="h-full rounded-full bg-[#ef7657] transition-all duration-500" style={{ width: `${Math.min(100, (reviewedToday / dailyGoal) * 100)}%` }} />
           </div>
-           <p className="mt-3 text-xs leading-relaxed text-[#aab3bd]">{reviewedToday >= dailyGoal ? 'Daily rhythm complete. Beautiful work.' : `${dailyGoal - reviewedToday} ${dailyGoal - reviewedToday === 1 ? 'word' : 'words'} left in today’s rhythm.`}</p>
+            <p className="mt-3 text-xs leading-relaxed text-[#aab3bd]">{reviewedToday >= dailyGoal ? t.dailyRhythmComplete : t.dailyWordsLeft(dailyGoal - reviewedToday)}</p>
           <button type="button" data-testid="button-reset-session" onClick={onReset} className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#dce1dc] transition-colors hover:text-[#f3d24f]">
-            <RotateCcw size={12} /> Reset session
+             <RotateCcw size={12} /> {t.resetSession}
           </button>
         </div>
-        <div className="mt-5 flex items-center gap-2 px-2 text-[11px] text-[#84909f]"><Command size={12} /> <span>Built for the long game</span></div>
+         <div className="mt-5 flex items-center gap-2 px-2 text-[11px] text-[#84909f]"><Command size={12} /> <span>{t.builtForLongGame}</span></div>
       </aside>
     </>
   );
@@ -240,16 +471,17 @@ function AuthControls() {
   const { isLoaded, isSignedIn, user } = useUser();
   const { signOut } = useClerk();
   const [, setLocation] = useLocation();
+  const { t } = useLanguage();
 
   if (!isLoaded) {
-    return <div className="h-9 w-24 animate-pulse rounded-full bg-[#e9e3d7]" aria-label="Loading account" />;
+    return <div className="h-9 w-24 animate-pulse rounded-full bg-[#e9e3d7]" aria-label={t.loadingAccount} />;
   }
 
   if (!isSignedIn) {
     return (
       <div className="flex items-center gap-1.5">
-        <button type="button" data-testid="button-login" onClick={() => setLocation('/sign-in')} className="rounded-full px-3 py-2 text-xs font-semibold text-[#5f675f] transition-colors hover:bg-[#e9e3d7] hover:text-[#202a40]">Log in</button>
-        <button type="button" data-testid="button-sign-up" onClick={() => setLocation('/sign-up')} className="rounded-full bg-[#202a40] px-3.5 py-2 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852]">Sign up</button>
+        <button type="button" data-testid="button-login" onClick={() => setLocation('/sign-in')} className="rounded-full px-3 py-2 text-xs font-semibold text-[#5f675f] transition-colors hover:bg-[#e9e3d7] hover:text-[#202a40]">{t.login}</button>
+        <button type="button" data-testid="button-sign-up" onClick={() => setLocation('/sign-up')} className="rounded-full bg-[#202a40] px-3.5 py-2 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852]">{t.signUp}</button>
       </div>
     );
   }
@@ -259,26 +491,28 @@ function AuthControls() {
     <div className="flex items-center gap-2">
       <div className="hidden text-right sm:block">
         <div className="max-w-[130px] truncate text-xs font-semibold text-[#202a40]">{user.firstName ?? user.primaryEmailAddress?.emailAddress}</div>
-        <div className="font-mono-custom text-[9px] uppercase tracking-[.12em] text-[#858982]">Synced account</div>
+        <div className="font-mono-custom text-[9px] uppercase tracking-[.12em] text-[#858982]">{t.syncedAccount}</div>
       </div>
       <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e6c94d] bg-[#f3d24f] text-xs font-bold text-[#202a40]" data-testid="avatar-user">{initials}</div>
-      <button type="button" data-testid="button-logout" onClick={() => signOut({ redirectUrl: basePath || '/' })} className="rounded-full px-2.5 py-2 text-xs font-semibold text-[#71776f] transition-colors hover:bg-[#e9e3d7] hover:text-[#202a40]">Log out</button>
+      <button type="button" data-testid="button-logout" onClick={() => signOut({ redirectUrl: basePath || '/' })} className="rounded-full px-2.5 py-2 text-xs font-semibold text-[#71776f] transition-colors hover:bg-[#e9e3d7] hover:text-[#202a40]">{t.logout}</button>
     </div>
   );
 }
 
 function TopBar({ view, setView, openMenu }: { view: AppView; setView: (view: AppView) => void; openMenu: () => void }) {
-  const formattedDate = new Intl.DateTimeFormat('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+  const { language, t, setLanguage } = useLanguage();
+  const formattedDate = new Intl.DateTimeFormat(language === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
   return (
-    <header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-[#ded8ca] bg-[#f6f2e9]/90 px-5 backdrop-blur-md md:ml-[264px] md:px-10">
+    <header className="app-topbar sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-[#ded8ca] bg-[#f6f2e9]/90 px-5 backdrop-blur-md md:ml-[264px] md:px-10">
       <div className="flex items-center gap-3">
-        <button type="button" data-testid="button-open-menu" onClick={openMenu} className="rounded-lg p-2 text-[#202a40] hover:bg-[#e9e3d7] md:hidden" aria-label="Open menu"><Menu size={20} /></button>
+        <button type="button" data-testid="button-open-menu" onClick={openMenu} className="rounded-lg p-2 text-[#202a40] hover:bg-[#e9e3d7] md:hidden" aria-label={t.mainNavigation}><Menu size={20} /></button>
         <div className="font-mono-custom text-[10px] uppercase tracking-[0.18em] text-[#858982]">{formattedDate}</div>
       </div>
       <div className="flex items-center gap-2">
-        <button type="button" data-testid="button-top-study" onClick={() => setView('study')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'study' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>Study</button>
-        <button type="button" data-testid="button-top-browse" onClick={() => setView('browse')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'browse' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>Browse</button>
-        <button type="button" data-testid="button-top-all-days" onClick={() => setView('all-days')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'all-days' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>All Days</button>
+        <button type="button" data-testid="button-top-study" onClick={() => setView('study')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'study' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>{t.study}</button>
+        <button type="button" data-testid="button-top-browse" onClick={() => setView('browse')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'browse' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>{t.browse}</button>
+        <button type="button" data-testid="button-top-all-days" onClick={() => setView('all-days')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'all-days' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>{t.allDays}</button>
+        <button type="button" data-testid="button-language-toggle" onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')} aria-label={t.languageButtonLabel} className="rounded-full border border-[#d6d1c6] bg-[#fbf8f1] px-3 py-1.5 text-xs font-semibold text-[#24635f] transition-colors hover:border-[#24635f] hover:bg-[#e9e3d7]">{t.languageButton}</button>
         <AuthControls />
       </div>
     </header>
@@ -297,6 +531,7 @@ function StatCard({ label, value, detail, accent }: { label: string; value: stri
 }
 
 function PronunciationButtons({ text, label, testIdPrefix }: { text: string; label: string; testIdPrefix: string }) {
+  const { language, t } = useLanguage();
   const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
   const speak = (locale: 'en-US' | 'en-GB') => {
     if (!canSpeak) return;
@@ -313,8 +548,8 @@ function PronunciationButtons({ text, label, testIdPrefix }: { text: string; lab
   };
 
   return (
-    <div className="flex shrink-0 items-center gap-1 rounded-full border border-[#d6d1c6] bg-[#f6f2e9] p-1" aria-label={`${label} pronunciation`}>
-      <span className="px-1.5 font-mono-custom text-[9px] uppercase tracking-[0.12em] text-[#858982]">Audio</span>
+    <div className="flex shrink-0 items-center gap-1 rounded-full border border-[#d6d1c6] bg-[#f6f2e9] p-1" aria-label={`${label} ${language === 'ar' ? 'النطق' : 'pronunciation'}`}>
+      <span className="px-1.5 font-mono-custom text-[9px] uppercase tracking-[0.12em] text-[#858982]">{t.audio}</span>
       {[
         { locale: 'en-US' as const, shortLabel: 'US' },
         { locale: 'en-GB' as const, shortLabel: 'UK' },
@@ -325,8 +560,8 @@ function PronunciationButtons({ text, label, testIdPrefix }: { text: string; lab
           data-testid={`${testIdPrefix}-${shortLabel.toLowerCase()}`}
           onClick={() => speak(locale)}
           disabled={!canSpeak}
-          title={canSpeak ? `Play ${shortLabel} pronunciation` : 'Speech playback is unavailable in this browser'}
-          aria-label={`Play ${label} in ${shortLabel} English`}
+          title={canSpeak ? t.playPronunciation(label, shortLabel) : t.pronunciationUnavailable}
+          aria-label={t.playPronunciation(label, shortLabel)}
           className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[10px] font-semibold text-[#5f675f] transition-colors hover:bg-[#f3d24f] hover:text-[#202a40] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Volume2 size={12} />
@@ -338,6 +573,7 @@ function PronunciationButtons({ text, label, testIdPrefix }: { text: string; lab
 }
 
 function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, current, total, isReviewed, onMarkReviewed, onSaveWord }: { word: EditableWord; revealed: boolean; onReveal: () => void; onNext: () => void; onPrevious: () => void; onShuffle: () => void; current: number; total: number; isReviewed: boolean; onMarkReviewed: () => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
+  const { language, t } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<WordOverrides>({});
   const startEditing = () => {
@@ -359,36 +595,36 @@ function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, cu
     <section className="animate-rise" data-testid="section-flashcard">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <div className="font-mono-custom text-[10px] uppercase tracking-[0.19em] text-[#858982]">Focused practice</div>
-          <h2 className="mt-1 font-display text-[27px] tracking-[-0.035em] text-[#202a40]">One word at a time.</h2>
+           <div className="font-mono-custom text-[10px] uppercase tracking-[0.19em] text-[#858982]">{t.focusedPractice}</div>
+           <h2 className="mt-1 font-display text-[27px] tracking-[-0.035em] text-[#202a40]">{t.oneWordAtTime}</h2>
         </div>
         <button type="button" data-testid="button-shuffle" onClick={onShuffle} className="group flex items-center gap-2 rounded-full border border-[#d6d1c6] bg-[#fbf8f1] px-3 py-2 text-xs font-semibold text-[#5f675f] transition-all hover:border-[#ef7657] hover:text-[#c14f39]">
-          <Shuffle size={14} className="transition-transform duration-300 group-hover:rotate-180" /> Shuffle
+           <Shuffle size={14} className="transition-transform duration-300 group-hover:rotate-180" /> {t.shuffle}
         </button>
       </div>
       <div className="relative overflow-hidden rounded-[26px] border border-[#d4cec0] bg-[#fbf8f1] shadow-[0_14px_34px_rgba(31,41,55,.08)]">
         <div className="flex items-center justify-between border-b border-[#e4ded2] px-6 py-4 sm:px-9">
-          <span className="font-mono-custom text-[10px] uppercase tracking-[0.16em] text-[#858982]">Card {String(current + 1).padStart(2, '0')} <span className="text-[#c8c1b2]">/ {String(total).padStart(2, '0')}</span></span>
+           <span className="font-mono-custom text-[10px] uppercase tracking-[0.16em] text-[#858982]">{t.card} {String(current + 1).padStart(2, '0')} <span className="text-[#c8c1b2]">/ {String(total).padStart(2, '0')}</span></span>
            <div className="flex items-center gap-2">
              <span className={`rounded-full px-2.5 py-1 font-mono-custom text-[10px] font-medium ${word.level === 'A1' ? 'bg-[#d9eee9] text-[#24635f]' : word.level === 'A2' ? 'bg-[#e5e9d2] text-[#5d6732]' : word.level === 'B1' ? 'bg-[#f8e7ba] text-[#7d5b19]' : 'bg-[#f7d8cd] text-[#a04b39]'}`}>{word.level}</span>
-             <button type="button" data-testid="button-edit-word" onClick={startEditing} className="inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] bg-[#f6f2e9] px-2.5 py-1.5 text-[11px] font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]"><Pencil size={12} /> Edit</button>
+              <button type="button" data-testid="button-edit-word" onClick={startEditing} className="inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] bg-[#f6f2e9] px-2.5 py-1.5 text-[11px] font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]"><Pencil size={12} /> {t.edit}</button>
            </div>
         </div>
          <div key={`${word.id}-${revealed}-${editing}`} className="card-flip min-h-[340px] px-6 py-10 sm:min-h-[360px] sm:px-12 sm:py-12">
            {editing ? (
              <div className="animate-fade" data-testid="panel-edit-word">
-               <div className="flex items-center gap-2 text-[#24635f]"><Pencil size={15} /><span className="font-mono-custom text-[10px] uppercase tracking-[0.17em]">Edit this card</span></div>
+                <div className="flex items-center gap-2 text-[#24635f]"><Pencil size={15} /><span className="font-mono-custom text-[10px] uppercase tracking-[0.17em]">{t.editThisCard}</span></div>
                <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                 <label className="text-xs font-semibold text-[#5f675f]">English word<input value={draft.word ?? ''} onChange={(event) => updateDraft('word', event.target.value)} className={inputClassName} required /></label>
-                 <label className="text-xs font-semibold text-[#5f675f]">Part of speech<input value={draft.type ?? ''} onChange={(event) => updateDraft('type', event.target.value)} className={inputClassName} required /></label>
-                 <label className="text-xs font-semibold text-[#5f675f]">CEFR level<input value={draft.level ?? ''} onChange={(event) => updateDraft('level', event.target.value)} className={inputClassName} required /></label>
-                 <label className="text-xs font-semibold text-[#5f675f]">Arabic translation<input dir="rtl" value={draft.translation ?? ''} onChange={(event) => updateDraft('translation', event.target.value)} className={`${inputClassName} font-arabic`} required /></label>
-                 <label className="text-xs font-semibold text-[#5f675f] sm:col-span-2">English example<textarea value={draft.example ?? ''} onChange={(event) => updateDraft('example', event.target.value)} className={`${inputClassName} min-h-20 resize-y`} required /></label>
-                 <label className="text-xs font-semibold text-[#5f675f] sm:col-span-2">Arabic example translation<textarea dir="rtl" value={draft.exampleTranslation ?? ''} onChange={(event) => updateDraft('exampleTranslation', event.target.value)} className={`${inputClassName} min-h-20 resize-y font-arabic`} required /></label>
+                  <label className="text-xs font-semibold text-[#5f675f]">{t.englishWord}<input value={draft.word ?? ''} onChange={(event) => updateDraft('word', event.target.value)} className={inputClassName} required /></label>
+                  <label className="text-xs font-semibold text-[#5f675f]">{t.partOfSpeech}<input value={draft.type ?? ''} onChange={(event) => updateDraft('type', event.target.value)} className={inputClassName} required /></label>
+                  <label className="text-xs font-semibold text-[#5f675f]">{t.cefrLevel}<input value={draft.level ?? ''} onChange={(event) => updateDraft('level', event.target.value)} className={inputClassName} required /></label>
+                  <label className="text-xs font-semibold text-[#5f675f]">{t.arabicTranslation}<input dir="rtl" value={draft.translation ?? ''} onChange={(event) => updateDraft('translation', event.target.value)} className={`${inputClassName} font-arabic`} required /></label>
+                  <label className="text-xs font-semibold text-[#5f675f] sm:col-span-2">{t.englishExample}<textarea value={draft.example ?? ''} onChange={(event) => updateDraft('example', event.target.value)} className={`${inputClassName} min-h-20 resize-y`} required /></label>
+                  <label className="text-xs font-semibold text-[#5f675f] sm:col-span-2">{t.arabicExampleTranslation}<textarea dir="rtl" value={draft.exampleTranslation ?? ''} onChange={(event) => updateDraft('exampleTranslation', event.target.value)} className={`${inputClassName} min-h-20 resize-y font-arabic`} required /></label>
                </div>
                <div className="mt-6 flex justify-end gap-2">
-                 <button type="button" onClick={cancelEditing} className="inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] px-3 py-2 text-xs font-semibold text-[#737970] hover:bg-[#eee8dc]"><X size={14} /> Cancel</button>
-                 <button type="button" data-testid="button-save-word" onClick={saveEditing} className="inline-flex items-center gap-1.5 rounded-full bg-[#24635f] px-3.5 py-2 text-xs font-semibold text-[#f9f5e9] hover:bg-[#1c514e]"><Save size={14} /> Save changes</button>
+                  <button type="button" onClick={cancelEditing} className="inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] px-3 py-2 text-xs font-semibold text-[#737970] hover:bg-[#eee8dc]"><X size={14} /> {t.cancel}</button>
+                  <button type="button" data-testid="button-save-word" onClick={saveEditing} className="inline-flex items-center gap-1.5 rounded-full bg-[#24635f] px-3.5 py-2 text-xs font-semibold text-[#f9f5e9] hover:bg-[#1c514e]"><Save size={14} /> {t.saveChanges}</button>
                </div>
              </div>
            ) : (
@@ -399,7 +635,7 @@ function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, cu
           </div>
           <div className="mt-7 flex flex-wrap items-end gap-x-4 gap-y-2">
             <h3 className="font-display text-[clamp(3.5rem,8vw,6.2rem)] leading-[.9] tracking-[-0.065em] text-[#202a40]" data-testid="text-current-word">{word.word}</h3>
-             <PronunciationButtons text={word.word} label={`the word ${word.word}`} testIdPrefix="button-pronounce-word" />
+              <PronunciationButtons text={word.word} label={language === 'ar' ? `كلمة ${word.word}` : `the word ${word.word}`} testIdPrefix="button-pronounce-word" />
           </div>
           {revealed ? (
             <div className="animate-fade mt-8 border-t border-[#e4ded2] pt-6" data-testid="panel-answer">
@@ -409,19 +645,19 @@ function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, cu
                    <p className="text-[15px] leading-relaxed text-[#3d4651]" data-testid="text-example">“{word.example}”</p>
                    <p className="font-arabic text-[13px] leading-relaxed text-[#858982]" dir="rtl" data-testid="text-example-translation">{word.exampleTranslation}</p>
                  </div>
-                 <PronunciationButtons text={word.example} label="the example sentence" testIdPrefix="button-pronounce-example" />
+                  <PronunciationButtons text={word.example} label={language === 'ar' ? 'جملة المثال' : t.exampleSentence} testIdPrefix="button-pronounce-example" />
               </div>
             </div>
           ) : (
-            <button type="button" data-testid="button-reveal" onClick={onReveal} className="mt-9 flex items-center gap-2 border-b border-dashed border-[#9da398] pb-1 text-sm font-semibold text-[#5f675f] transition-colors hover:border-[#ef7657] hover:text-[#c14f39]">Tap to reveal <ArrowRight size={15} /></button>
+            <button type="button" data-testid="button-reveal" onClick={onReveal} className="mt-9 flex items-center gap-2 border-b border-dashed border-[#9da398] pb-1 text-sm font-semibold text-[#5f675f] transition-colors hover:border-[#ef7657] hover:text-[#c14f39]">{t.tapToReveal} <ArrowRight size={15} /></button>
           )}
              </>
            )}
         </div>
         <div className="flex items-center justify-between border-t border-[#e4ded2] px-5 py-4 sm:px-9">
-          <button type="button" data-testid="button-previous" onClick={onPrevious} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-[#737970] transition-colors hover:bg-[#eee8dc] hover:text-[#202a40]"><ArrowLeft size={15} /> Previous</button>
-          <button type="button" data-testid="button-mark-known" onClick={onMarkReviewed} className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-all ${isReviewed ? 'bg-[#d9eee9] text-[#24635f]' : 'text-[#737970] hover:bg-[#f3d24f] hover:text-[#202a40]'}`}><Check size={14} /> {isReviewed ? 'In your rhythm' : 'I know this'}</button>
-          <button type="button" data-testid="button-next" onClick={onNext} className="flex items-center gap-2 rounded-lg bg-[#202a40] px-3.5 py-2.5 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852]">Next word <ArrowRight size={15} /></button>
+          <button type="button" data-testid="button-previous" onClick={onPrevious} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-[#737970] transition-colors hover:bg-[#eee8dc] hover:text-[#202a40]"><ArrowLeft size={15} /> {t.previous}</button>
+          <button type="button" data-testid="button-mark-known" onClick={onMarkReviewed} className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-all ${isReviewed ? 'bg-[#d9eee9] text-[#24635f]' : 'text-[#737970] hover:bg-[#f3d24f] hover:text-[#202a40]'}`}><Check size={14} /> {isReviewed ? t.inYourRhythm : t.iKnowThis}</button>
+          <button type="button" data-testid="button-next" onClick={onNext} className="flex items-center gap-2 rounded-lg bg-[#202a40] px-3.5 py-2.5 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852]">{t.nextWord} <ArrowRight size={15} /></button>
         </div>
       </div>
     </section>
@@ -429,52 +665,54 @@ function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, cu
 }
 
 function Filters({ search, setSearch, level, setLevel, part, setPart, resultCount }: { search: string; setSearch: (value: string) => void; level: string; setLevel: (value: string) => void; part: string; setPart: (value: string) => void; resultCount: number }) {
+  const { language, t } = useLanguage();
   return (
     <div className="rounded-2xl border border-[#ded8ca] bg-[#fbf8f1] p-3 shadow-[0_2px_5px_rgba(31,41,55,.03)]" data-testid="panel-filters">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <label className="relative flex-1">
           <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#969b91]" />
-          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search English or Arabic" data-testid="input-search" className="h-11 w-full rounded-xl border border-[#ded8ca] bg-[#f6f2e9] pl-10 pr-10 text-sm text-[#202a40] outline-none transition-colors placeholder:text-[#9b9e96] focus:border-[#24635f] focus:ring-2 focus:ring-[#24635f]/10" />
-          {search && <button type="button" data-testid="button-clear-search" onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#969b91] hover:text-[#202a40]" aria-label="Clear search"><X size={15} /></button>}
+          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchEnglishArabic} data-testid="input-search" className={`h-11 w-full rounded-xl border border-[#ded8ca] bg-[#f6f2e9] text-sm text-[#202a40] outline-none transition-colors placeholder:text-[#9b9e96] focus:border-[#24635f] focus:ring-2 focus:ring-[#24635f]/10 ${language === 'ar' ? 'pr-10 pl-10' : 'pl-10 pr-10'}`} />
+          {search && <button type="button" data-testid="button-clear-search" onClick={() => setSearch('')} className={`absolute top-1/2 -translate-y-1/2 text-[#969b91] hover:text-[#202a40] ${language === 'ar' ? 'left-3' : 'right-3'}`} aria-label={t.clearSearch}><X size={15} /></button>}
         </label>
         <div className="flex flex-wrap gap-2">
           <label className="relative">
-            <span className="sr-only">CEFR level</span>
-            <select value={level} onChange={(e) => setLevel(e.target.value)} data-testid="select-level" className="h-11 min-w-[128px] appearance-none rounded-xl border border-[#ded8ca] bg-[#f6f2e9] px-3.5 pr-8 text-xs font-semibold text-[#49534d] outline-none focus:border-[#24635f]">
-              {levelOptions.map((item) => <option key={item}>{item}</option>)}
+            <span className="sr-only">{t.cefrLevel}</span>
+            <select value={level} onChange={(e) => setLevel(e.target.value)} data-testid="select-level" className={`h-11 min-w-[128px] appearance-none rounded-xl border border-[#ded8ca] bg-[#f6f2e9] px-3.5 text-xs font-semibold text-[#49534d] outline-none focus:border-[#24635f] ${language === 'ar' ? 'pl-8' : 'pr-8'}`}>
+              {levelOptions.map((item) => <option key={item} value={item}>{item === 'All levels' ? t.allLevels : item}</option>)}
             </select>
-            <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#858982]" />
+            <ChevronDown size={14} className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-[#858982] ${language === 'ar' ? 'left-2.5' : 'right-2.5'}`} />
           </label>
           <label className="relative">
-            <span className="sr-only">Part of speech</span>
-            <select value={part} onChange={(e) => setPart(e.target.value)} data-testid="select-part" className="h-11 min-w-[140px] appearance-none rounded-xl border border-[#ded8ca] bg-[#f6f2e9] px-3.5 pr-8 text-xs font-semibold capitalize text-[#49534d] outline-none focus:border-[#24635f]">
-              {typeOptions.map((item) => <option key={item}>{item}</option>)}
+            <span className="sr-only">{t.partOfSpeech}</span>
+            <select value={part} onChange={(e) => setPart(e.target.value)} data-testid="select-part" className={`h-11 min-w-[140px] appearance-none rounded-xl border border-[#ded8ca] bg-[#f6f2e9] px-3.5 text-xs font-semibold capitalize text-[#49534d] outline-none focus:border-[#24635f] ${language === 'ar' ? 'pl-8' : 'pr-8'}`}>
+              {typeOptions.map((item) => <option key={item} value={item}>{item === 'All parts' ? t.allParts : displayPartOfSpeech(item, language)}</option>)}
             </select>
-            <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#858982]" />
+            <ChevronDown size={14} className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-[#858982] ${language === 'ar' ? 'left-2.5' : 'right-2.5'}`} />
           </label>
         </div>
       </div>
-      <div className="mt-3 flex items-center gap-2 px-1 text-[11px] text-[#858982]"><ListFilter size={13} /> <span data-testid="text-result-count">{resultCount} words in view</span></div>
+      <div className="mt-3 flex items-center gap-2 px-1 text-[11px] text-[#858982]"><ListFilter size={13} /> <span data-testid="text-result-count">{t.resultCount(resultCount)}</span></div>
     </div>
   );
 }
 
 function BrowseList({ words, onSelect }: { words: EditableWord[]; onSelect: (word: EditableWord) => void }) {
+  const { language, t } = useLanguage();
   return (
     <section className="animate-rise mt-6" data-testid="section-word-library">
       <div className="mb-4 flex items-end justify-between">
-        <div><div className="font-mono-custom text-[10px] uppercase tracking-[0.19em] text-[#858982]">The whole shelf</div><h2 className="mt-1 font-display text-[27px] tracking-[-0.035em] text-[#202a40]">Browse the library.</h2></div>
-        <span className="hidden text-xs text-[#858982] sm:block">Select a word to study it</span>
+        <div><div className="font-mono-custom text-[10px] uppercase tracking-[0.19em] text-[#858982]">{t.theWholeShelf}</div><h2 className="mt-1 font-display text-[27px] tracking-[-0.035em] text-[#202a40]">{t.browseLibrary}</h2></div>
+        <span className="hidden text-xs text-[#858982] sm:block">{t.selectWordToStudy}</span>
       </div>
       {words.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#c9c2b5] bg-[#fbf8f1] px-6 py-16 text-center" data-testid="empty-search-results"><div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#f7d8cd] text-[#a04b39]"><Search size={18} /></div><h3 className="mt-4 font-display text-xl text-[#202a40]">No words match that search.</h3><p className="mt-1 text-sm text-[#858982]">Try a different spelling, level, or part of speech.</p></div>
+         <div className="rounded-2xl border border-dashed border-[#c9c2b5] bg-[#fbf8f1] px-6 py-16 text-center" data-testid="empty-search-results"><div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#f7d8cd] text-[#a04b39]"><Search size={18} /></div><h3 className="mt-4 font-display text-xl text-[#202a40]">{t.noWordsMatch}</h3><p className="mt-1 text-sm text-[#858982]">{t.tryDifferentSearch}</p></div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-[#ded8ca] bg-[#fbf8f1]" data-testid="list-words">
           {words.map((word, index) => (
-            <button type="button" key={word.id} data-testid={`button-word-${word.id}`} onClick={() => onSelect(word)} className="group flex w-full items-center gap-4 border-b border-[#e8e2d7] px-4 py-4 text-left transition-colors last:border-b-0 hover:bg-[#f5edda] sm:px-6">
+             <button type="button" key={word.id} data-testid={`button-word-${word.id}`} onClick={() => onSelect(word)} className={`group flex w-full items-center gap-4 border-b border-[#e8e2d7] px-4 py-4 transition-colors last:border-b-0 hover:bg-[#f5edda] sm:px-6 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
               <span className="w-6 font-mono-custom text-[10px] text-[#afb1a8]">{String(index + 1).padStart(2, '0')}</span>
               <span className="min-w-0 flex-1"><span className="block font-display text-[22px] leading-none tracking-[-.02em] text-[#202a40] transition-colors group-hover:text-[#24635f]">{word.word}</span><span className="font-arabic mt-1 block text-xs text-[#858982]" dir="rtl">{word.translation}</span></span>
-              <span className="hidden rounded-full bg-[#e9e3d7] px-2.5 py-1 font-mono-custom text-[10px] capitalize text-[#666d65] sm:block">{word.type}</span>
+               <span className="hidden rounded-full bg-[#e9e3d7] px-2.5 py-1 font-mono-custom text-[10px] capitalize text-[#666d65] sm:block">{displayPartOfSpeech(word.type, language)}</span>
               <span className="w-8 text-center font-mono-custom text-[10px] text-[#24635f]">{word.level}</span>
               <ArrowRight size={15} className="text-[#b7b8b0] transition-transform group-hover:translate-x-1 group-hover:text-[#ef7657]" />
             </button>
@@ -486,6 +724,7 @@ function BrowseList({ words, onSelect }: { words: EditableWord[]; onSelect: (wor
 }
 
 function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, markReviewed, onSaveWord }: { words: EditableWord[]; currentIndex: number; setCurrentIndex: (index: number) => void; reviewed: Set<number>; markReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
+  const { language, t } = useLanguage();
   const [revealed, setRevealed] = useState(false);
   const current = words[currentIndex] ?? words[0];
   const goalPercent = Math.min(100, (reviewed.size / oxford3000.length) * 100);
@@ -499,7 +738,7 @@ function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, markReviewe
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [currentIndex, setCurrentIndex, words.length]);
-  if (!current) return <div className="rounded-2xl border border-dashed border-[#c9c2b5] p-10 text-center">No word to study yet.</div>;
+   if (!current) return <div className="rounded-2xl border border-dashed border-[#c9c2b5] p-10 text-center">{t.noWordToStudy}</div>;
   const next = () => setCurrentIndex((currentIndex + 1) % words.length);
   const previous = () => setCurrentIndex((currentIndex - 1 + words.length) % words.length);
   const shuffle = () => setCurrentIndex(Math.floor(Math.random() * words.length));
@@ -507,25 +746,25 @@ function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, markReviewe
     <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_280px]">
       <div>
          <Flashcard word={current} revealed={revealed} onReveal={() => setRevealed(true)} onNext={next} onPrevious={previous} onShuffle={shuffle} current={currentIndex} total={words.length} isReviewed={reviewed.has(current.id)} onMarkReviewed={() => markReviewed(current.id)} onSaveWord={onSaveWord} />
-        <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-[#9a9e94]" data-testid="text-keyboard-hint"><span className="rounded border border-[#d8d2c6] bg-[#fbf8f1] px-1.5 py-0.5 font-mono-custom text-[10px]">space</span> to reveal <span className="mx-1 text-[#c5c0b5]">·</span> <span className="rounded border border-[#d8d2c6] bg-[#fbf8f1] px-1.5 py-0.5 font-mono-custom text-[10px]">← →</span> to move</div>
+         <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-[#9a9e94]" data-testid="text-keyboard-hint"><span className="rounded border border-[#d8d2c6] bg-[#fbf8f1] px-1.5 py-0.5 font-mono-custom text-[10px]">space</span> {t.keyboardHint} <span className="mx-1 text-[#c5c0b5]">·</span> <span className="rounded border border-[#d8d2c6] bg-[#fbf8f1] px-1.5 py-0.5 font-mono-custom text-[10px]">← →</span> {t.keyboardMove}</div>
       </div>
       <aside className="space-y-4">
         <div className="relative overflow-hidden rounded-2xl bg-[#24635f] p-5 text-[#f9f5e9]">
           <div className="absolute -right-10 -top-12 h-36 w-36 rounded-full border-[18px] border-[#4c8a81]/40" />
-           <div className="relative flex items-start justify-between"><div><div className="font-mono-custom text-[9px] uppercase tracking-[.18em] text-[#b9d5ca]">Your 3,000 goal</div><div className="mt-2 font-display text-[38px] leading-none">{reviewed.size} <span className="font-sans text-[15px] font-medium text-[#b9d5ca]">/ 3,000</span></div></div><div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: `conic-gradient(#f3d24f ${goalPercent}%, #3d7972 ${goalPercent}%)` }}><div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#24635f] font-mono-custom text-[10px] text-[#f3d24f]">{goalPercent.toFixed(1)}%</div></div></div>
+           <div className="relative flex items-start justify-between"><div><div className="font-mono-custom text-[9px] uppercase tracking-[.18em] text-[#b9d5ca]">{t.yourGoal}</div><div className="mt-2 font-display text-[38px] leading-none">{reviewed.size} <span className="font-sans text-[15px] font-medium text-[#b9d5ca]">/ 3,000</span></div></div><div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: `conic-gradient(#f3d24f ${goalPercent}%, #3d7972 ${goalPercent}%)` }}><div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#24635f] font-mono-custom text-[10px] text-[#f3d24f]">{goalPercent.toFixed(1)}%</div></div></div>
            <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-[#1d5653]"><div className="h-full rounded-full bg-[#f3d24f] transition-all duration-500" style={{ width: `${goalPercent}%` }} /></div>
-          <p className="mt-3 text-xs leading-relaxed text-[#d5e5dc]">A small, steady shelf becomes fluency.</p>
+           <p className="mt-3 text-xs leading-relaxed text-[#d5e5dc]">{t.smallShelf}</p>
         </div>
         <div className="rounded-2xl border border-[#ded8ca] bg-[#fbf8f1] p-5">
-          <div className="flex items-center justify-between"><h3 className="font-semibold text-[#202a40]">Level map</h3><span className="font-mono-custom text-[9px] uppercase tracking-[.14em] text-[#858982]">Words</span></div>
+           <div className="flex items-center justify-between"><h3 className="font-semibold text-[#202a40]">{t.levelMap}</h3><span className="font-mono-custom text-[9px] uppercase tracking-[.14em] text-[#858982]">{t.words}</span></div>
           <div className="mt-5 space-y-4">
              {['A1', 'A2', 'B1', 'B2'].map((level, index) => { const count = oxford3000.filter((word) => word.level === level).length; const maxLevelCount = 800; return <div key={level} className="flex items-center gap-3"><span className="w-6 font-mono-custom text-[10px] text-[#858982]">{level}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-[#e9e3d7]"><div className={`h-full rounded-full ${index === 0 ? 'bg-[#24635f]' : index === 1 ? 'bg-[#6e9d83]' : index === 2 ? 'bg-[#e5ad48]' : 'bg-[#ef7657]'}`} style={{ width: `${(count / maxLevelCount) * 100}%` }} /></div><span className="w-8 text-right font-mono-custom text-[10px] text-[#858982]">{count}</span></div>; })}
           </div>
-          <button type="button" data-testid="button-view-library" onClick={() => document.getElementById('library')?.scrollIntoView({ behavior: 'smooth' })} className="mt-6 flex w-full items-center justify-between border-t border-[#e8e2d7] pt-4 text-xs font-semibold text-[#24635f] hover:text-[#ef7657]">Explore all words <ArrowRight size={14} /></button>
+           <button type="button" data-testid="button-view-library" onClick={() => document.getElementById('library')?.scrollIntoView({ behavior: 'smooth' })} className="mt-6 flex w-full items-center justify-between border-t border-[#e8e2d7] pt-4 text-xs font-semibold text-[#24635f] hover:text-[#ef7657]">{t.exploreAllWords} <ArrowRight size={14} /></button>
         </div>
         <div className="rounded-2xl border border-[#ded8ca] bg-[#f5edda] p-5">
-          <div className="flex items-center gap-2 text-[#c45a42]"><BookOpen size={15} /><span className="font-mono-custom text-[9px] uppercase tracking-[.16em]">Study note</span></div>
-          <p className="mt-3 font-display text-[19px] leading-snug text-[#202a40]">“See the word in a sentence. That is where it starts to belong to you.”</p>
+           <div className="flex items-center gap-2 text-[#c45a42]"><BookOpen size={15} /><span className="font-mono-custom text-[9px] uppercase tracking-[.16em]">{t.studyNote}</span></div>
+           <p className="mt-3 font-display text-[19px] leading-snug text-[#202a40]">{t.quote}</p>
           <p className="mt-3 font-arabic text-[12px] text-[#858982]" dir="rtl">الكلمة تعيش في الجملة.</p>
         </div>
       </aside>
@@ -534,17 +773,18 @@ function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, markReviewe
 }
 
 function AllDaysOverview({ days, reviewed, completedDays, onSelectDay }: { days: EditableWord[][]; reviewed: Set<number>; completedDays: Set<number>; onSelectDay: (dayIndex: number) => void }) {
+  const { language, t } = useLanguage();
   return (
     <section className="animate-rise" data-testid="section-all-days">
       <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
         <div>
-          <div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.21em] text-[#24635f]"><span className="h-2 w-2 rounded-full bg-[#ef7657]" /> A steady path through every word</div>
-          <h1 className="mt-3 max-w-[680px] font-display text-[clamp(2.6rem,5.3vw,4.7rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-all-days">All days, one <em className="text-[#24635f]">steady rhythm.</em></h1>
-          <p className="mt-4 max-w-[510px] text-[14px] leading-relaxed text-[#71776f]">Your complete vocabulary journey, arranged in focused daily sets of twelve words.</p>
+          <div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.21em] text-[#24635f]"><span className="h-2 w-2 rounded-full bg-[#ef7657]" /> {t.steadyPath}</div>
+          <h1 className="mt-3 max-w-[680px] font-display text-[clamp(2.6rem,5.3vw,4.7rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-all-days">{t.allDaysTitle} <em className="text-[#24635f]">{t.steadyRhythm}</em></h1>
+          <p className="mt-4 max-w-[510px] text-[14px] leading-relaxed text-[#71776f]">{t.vocabularyJourney}</p>
         </div>
-        <div className="text-left md:text-right">
-          <div className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">Your daily map</div>
-          <div className="mt-1 font-display text-[31px] leading-none text-[#202a40]">{days.length} <span className="font-sans text-sm font-medium text-[#71776f]">days</span></div>
+        <div className={language === 'ar' ? 'text-right md:text-left' : 'text-left md:text-right'}>
+           <div className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">{t.dailyMap}</div>
+           <div className="mt-1 font-display text-[31px] leading-none text-[#202a40]">{days.length} <span className="font-sans text-sm font-medium text-[#71776f]">{t.days}</span></div>
         </div>
       </div>
       <div className="mt-9 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -559,22 +799,22 @@ function AllDaysOverview({ days, reviewed, completedDays, onSelectDay }: { days:
               key={dayIndex}
               data-testid={`button-all-days-day-${dayIndex + 1}`}
               onClick={() => onSelectDay(dayIndex)}
-              className="group relative overflow-hidden rounded-2xl border border-[#ded8ca] bg-[#fbf8f1] p-5 text-left shadow-[0_2px_5px_rgba(31,41,55,.03)] transition-all duration-200 hover:-translate-y-1 hover:border-[#24635f] hover:shadow-[0_10px_22px_rgba(31,41,55,.08)]"
+               className={`group relative overflow-hidden rounded-2xl border border-[#ded8ca] bg-[#fbf8f1] p-5 shadow-[0_2px_5px_rgba(31,41,55,.03)] transition-all duration-200 hover:-translate-y-1 hover:border-[#24635f] hover:shadow-[0_10px_22px_rgba(31,41,55,.08)] ${language === 'ar' ? 'text-right' : 'text-left'}`}
             >
               <div className="absolute right-0 top-0 h-1 w-14 bg-[#f3d24f] transition-all duration-200 group-hover:w-24" />
               <div className="flex items-center justify-between">
-                <span className="font-mono-custom text-[10px] uppercase tracking-[.17em] text-[#858982]">Daily set</span>
+                 <span className="font-mono-custom text-[10px] uppercase tracking-[.17em] text-[#858982]">{t.dailySet}</span>
                 {isComplete ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#d9eee9] px-2 py-1 font-mono-custom text-[9px] uppercase tracking-[.08em] text-[#24635f]"><Check size={11} /> Complete</span>
+                   <span className="inline-flex items-center gap-1 rounded-full bg-[#d9eee9] px-2 py-1 font-mono-custom text-[9px] uppercase tracking-[.08em] text-[#24635f]"><Check size={11} /> {t.complete}</span>
                 ) : (
                   <ArrowRight size={15} className="text-[#b7b8b0] transition-transform group-hover:translate-x-1 group-hover:text-[#ef7657]" />
                 )}
               </div>
               <div className="mt-5 flex items-end justify-between gap-3">
-                <h2 className="font-display text-[29px] leading-none tracking-[-.04em] text-[#202a40]">Day {dayIndex + 1}</h2>
-                <span className="rounded-full bg-[#e9e3d7] px-2.5 py-1 font-mono-custom text-[9px] text-[#666d65]">{dayWords.length} words</span>
+                 <h2 className="font-display text-[29px] leading-none tracking-[-.04em] text-[#202a40]">{t.dayLabel(dayIndex + 1)}</h2>
+                 <span className="rounded-full bg-[#e9e3d7] px-2.5 py-1 font-mono-custom text-[9px] text-[#666d65]">{t.wordsCount(dayWords.length)}</span>
               </div>
-              <p className="mt-4 truncate text-xs text-[#71776f]" title={`${firstWord} — ${lastWord}`}>{firstWord} <span className="text-[#c6bfb1]">to</span> {lastWord}</p>
+               <p className="mt-4 truncate text-xs text-[#71776f]" title={`${firstWord} — ${lastWord}`}>{firstWord} <span className="text-[#c6bfb1]">{t.to}</span> {lastWord}</p>
               <div className="mt-5 flex items-center gap-3 border-t border-[#e8e2d7] pt-4">
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e9e3d7]">
                   <div className="h-full rounded-full bg-[#24635f] transition-all duration-500" style={{ width: `${dayWords.length ? (reviewedCount / dayWords.length) * 100 : 0}%` }} />
@@ -590,21 +830,22 @@ function AllDaysOverview({ days, reviewed, completedDays, onSelectDay }: { days:
 }
 
 function AllDaysDetail({ dayNumber, words, reviewed, onBack }: { dayNumber: number; words: EditableWord[]; reviewed: Set<number>; onBack: () => void }) {
+  const { language, t } = useLanguage();
   const reviewedCount = words.filter((word) => reviewed.has(word.id)).length;
   return (
     <section className="animate-rise" data-testid="section-all-days-detail">
-      <button type="button" data-testid="button-all-days-back" onClick={onBack} className="inline-flex items-center gap-2 rounded-full border border-[#d6d1c6] bg-[#fbf8f1] px-3.5 py-2 text-xs font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]">
-        <ArrowLeft size={14} /> All Days
+       <button type="button" data-testid="button-all-days-back" onClick={onBack} className="inline-flex items-center gap-2 rounded-full border border-[#d6d1c6] bg-[#fbf8f1] px-3.5 py-2 text-xs font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]">
+         <ArrowLeft size={14} /> {t.allDaysBack}
       </button>
       <div className="mt-8 flex flex-col justify-between gap-5 border-b border-[#ded8ca] pb-7 md:flex-row md:items-end">
         <div>
-          <div className="font-mono-custom text-[10px] uppercase tracking-[.19em] text-[#858982]">Daily vocabulary set</div>
-          <h1 className="mt-2 font-display text-[clamp(2.8rem,5vw,4.8rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-day-detail">Day {dayNumber}</h1>
-          <p className="mt-3 font-arabic text-sm text-[#71776f]" dir="rtl">اليوم {dayNumber} · {words.length} كلمة</p>
+           <div className="font-mono-custom text-[10px] uppercase tracking-[.19em] text-[#858982]">{t.dailyVocabularySet}</div>
+           <h1 className="mt-2 font-display text-[clamp(2.8rem,5vw,4.8rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-day-detail">{t.dayLabel(dayNumber)}</h1>
+           <p className="mt-3 font-arabic text-sm text-[#71776f]" dir="rtl">{language === 'ar' ? `${t.dayLabel(dayNumber)} · ${t.wordsCount(words.length)}` : `اليوم ${dayNumber} · ${words.length} كلمة`}</p>
         </div>
-        <div className="rounded-2xl border border-[#ded8ca] bg-[#f5edda] px-4 py-3 text-left md:text-right">
-          <div className="font-mono-custom text-[9px] uppercase tracking-[.16em] text-[#858982]">Progress</div>
-          <div className="mt-1 font-display text-2xl text-[#202a40]">{reviewedCount} <span className="font-sans text-xs text-[#71776f]">/ {words.length} reviewed</span></div>
+        <div className={`rounded-2xl border border-[#ded8ca] bg-[#f5edda] px-4 py-3 ${language === 'ar' ? 'text-right md:text-left' : 'text-left md:text-right'}`}>
+           <div className="font-mono-custom text-[9px] uppercase tracking-[.16em] text-[#858982]">{t.progress}</div>
+           <div className="mt-1 font-display text-2xl text-[#202a40]">{reviewedCount} <span className="font-sans text-xs text-[#71776f]">/ {words.length} {t.reviewed}</span></div>
         </div>
       </div>
       <div className="mt-7 overflow-hidden rounded-2xl border border-[#ded8ca] bg-[#fbf8f1]" data-testid="list-all-days-words">
@@ -614,13 +855,13 @@ function AllDaysDetail({ dayNumber, words, reviewed, onBack }: { dayNumber: numb
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="font-display text-[25px] leading-none tracking-[-.02em] text-[#202a40]">{word.word}</h2>
-                <span className="rounded-full bg-[#e9e3d7] px-2 py-1 font-mono-custom text-[9px] uppercase text-[#666d65]">{word.type}</span>
+                 <span className="rounded-full bg-[#e9e3d7] px-2 py-1 font-mono-custom text-[9px] uppercase text-[#666d65]">{displayPartOfSpeech(word.type, language)}</span>
               </div>
               <p className="font-arabic mt-2 text-sm text-[#24635f]" dir="rtl">{word.translation}</p>
             </div>
             <div className="flex items-center gap-3 sm:justify-end">
               <span className={`rounded-full px-2.5 py-1 font-mono-custom text-[10px] ${word.level === 'A1' ? 'bg-[#d9eee9] text-[#24635f]' : word.level === 'A2' ? 'bg-[#e5e9d2] text-[#5d6732]' : word.level === 'B1' ? 'bg-[#f8e7ba] text-[#7d5b19]' : 'bg-[#f7d8cd] text-[#a04b39]'}`}>{word.level}</span>
-              {reviewed.has(word.id) && <span className="inline-flex items-center gap-1 font-mono-custom text-[9px] uppercase tracking-[.1em] text-[#24635f]"><Check size={12} /> Reviewed</span>}
+               {reviewed.has(word.id) && <span className="inline-flex items-center gap-1 font-mono-custom text-[9px] uppercase tracking-[.1em] text-[#24635f]"><Check size={12} /> {t.reviewed}</span>}
             </div>
           </article>
         ))}
@@ -639,6 +880,7 @@ function AllDaysView({ days, reviewed, completedDays, selectedDayIndex, onSelect
 
 function Home() {
   const { isLoaded: authLoaded, isSignedIn, user } = useUser();
+  const { language, t } = useLanguage();
   const progressQuery = useGetProgress({
     query: { queryKey: getGetProgressQueryKey(), enabled: authLoaded && !!isSignedIn, staleTime: 0 },
   });
@@ -777,20 +1019,20 @@ function Home() {
   const nextMilestone = reviewed.size >= oxford3000.length ? oxford3000.length : Math.min(oxford3000.length, Math.ceil((reviewed.size + 1) / 200) * 200);
   const wordsToMilestone = Math.max(0, nextMilestone - reviewed.size);
   return (
-    <div className="paper-grain min-h-[100dvh] bg-[#f6f2e9]">
+     <div className="app-shell paper-grain min-h-[100dvh] bg-[#f6f2e9]">
       <Sidebar view={view} setView={navigate} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} onReset={resetSession} reviewedToday={reviewedToday} />
       <TopBar view={view} setView={navigate} openMenu={() => setMobileOpen(true)} />
-      <main className="ml-0 px-5 pb-16 pt-9 md:ml-[264px] md:px-10 md:pt-12">
+       <main className="app-main ml-0 px-5 pb-16 pt-9 md:ml-[264px] md:px-10 md:pt-12">
         <div className="mx-auto max-w-[1250px]">
           {view === 'all-days' ? (
             <AllDaysView days={days} reviewed={reviewed} completedDays={completedDays} selectedDayIndex={selectedDayIndex} onSelectDay={selectDay} onBack={() => setSelectedDayIndex(null)} />
           ) : (
             <>
-          <div className="animate-rise mb-9 flex flex-col justify-between gap-5 md:flex-row md:items-end">
-            <div><div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.21em] text-[#24635f]"><span className="h-2 w-2 rounded-full bg-[#ef7657]" /> Your learning desk</div><h1 className="mt-3 max-w-[620px] font-display text-[clamp(2.6rem,5.3vw,4.7rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-page">{view === 'study' ? <>Make room for <em className="text-[#24635f]">better English.</em></> : <>Every word has a <em className="text-[#24635f]">place.</em></>}</h1><p className="mt-4 max-w-[470px] text-[14px] leading-relaxed text-[#71776f]">{view === 'study' ? 'A calm, focused practice for Arabic speakers. Meet a word, meet it again, then make it yours.' : 'Search the Oxford 3000 by meaning, level, or part of speech. Your next useful word is nearby.'}</p></div>
-            <div className="flex items-center gap-2 text-right"><div><div className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">Current streak</div><div className="mt-1 text-sm font-semibold text-[#202a40]">{currentStreak} {currentStreak === 1 ? 'day' : 'days'} <span className="ml-1 text-[#ef7657]">/</span> {currentStreak ? 'keep going' : 'start today'}</div></div><div className="ml-2 flex h-11 w-11 items-center justify-center rounded-full border border-[#e6c94d] bg-[#f3d24f] font-display text-xl text-[#202a40]">{currentStreak}</div></div>
+           <div className="animate-rise mb-9 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+             <div><div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.21em] text-[#24635f]"><span className="h-2 w-2 rounded-full bg-[#ef7657]" /> {t.learningDesk}</div><h1 className="mt-3 max-w-[620px] font-display text-[clamp(2.6rem,5.3vw,4.7rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-page">{view === 'study' ? <>{language === 'ar' ? 'اصنع مساحة لـ' : 'Make room for '}<em className="text-[#24635f]">{t.betterEnglish}</em></> : <>{t.everyWordHasAPlace} <em className="text-[#24635f]">{t.place}</em></>}</h1><p className="mt-4 max-w-[470px] text-[14px] leading-relaxed text-[#71776f]">{view === 'study' ? t.studyDescription : t.browseDescription}</p></div>
+             <div className="flex items-center gap-2 text-right"><div><div className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">{t.currentStreak}</div><div className="mt-1 text-sm font-semibold text-[#202a40]">{currentStreak} {currentStreak === 1 ? t.day : t.days} <span className="ml-1 text-[#ef7657]">/</span> {currentStreak ? t.keepGoing : t.startToday}</div></div><div className="ml-2 flex h-11 w-11 items-center justify-center rounded-full border border-[#e6c94d] bg-[#f3d24f] font-display text-xl text-[#202a40]">{currentStreak}</div></div>
           </div>
-            <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-4"><StatCard label="Words met" value={String(reviewed.size)} detail="of 3,000 in your goal" accent="bg-[#24635f]" /><StatCard label="In this view" value={String(filteredWords.length)} detail="matching your filters" accent="bg-[#ef7657]" /><StatCard label="Daily rhythm" value={`${Math.min(reviewedToday, dailyGoal)} / ${dailyGoal}`} detail="words in today's session" accent="bg-[#f3d24f]" /><StatCard label="Next milestone" value={reviewed.size >= oxford3000.length ? 'Complete' : String(nextMilestone)} detail={reviewed.size >= oxford3000.length ? 'Oxford 3000 finished' : `${wordsToMilestone} words to go`} accent="bg-[#779c7b]" /></div>
+             <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-4"><StatCard label={t.wordsMet} value={String(reviewed.size)} detail={t.wordsOfGoal} accent="bg-[#24635f]" /><StatCard label={t.inThisView} value={String(filteredWords.length)} detail={t.matchingFilters} accent="bg-[#ef7657]" /><StatCard label={t.dailyRhythm} value={`${Math.min(reviewedToday, dailyGoal)} / ${dailyGoal}`} detail={t.dailyWordsSession} accent="bg-[#f3d24f]" /><StatCard label={t.nextMilestone} value={reviewed.size >= oxford3000.length ? t.complete : String(nextMilestone)} detail={reviewed.size >= oxford3000.length ? t.oxfordFinished : `${wordsToMilestone} ${t.wordsToGo}`} accent="bg-[#779c7b]" /></div>
           <Filters search={search} setSearch={setSearch} level={level} setLevel={setLevel} part={part} setPart={setPart} resultCount={filteredWords.length} />
            <div className="mt-8" id="library">{view === 'study' ? <StudyHome words={filteredWords} currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} reviewed={reviewed} markReviewed={markReviewed} onSaveWord={saveWord} /> : <BrowseList words={filteredWords} onSelect={selectWord} />}</div>
             </>
@@ -827,6 +1069,169 @@ function SignUpPage() {
 
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
+  const { language } = useLanguage();
+  const clerkLocalization = language === 'ar'
+    ? {
+        ...arSA,
+        developmentMode: 'وضع التطوير',
+        formFieldInputPlaceholder__backupCode: 'أدخل الرمز الاحتياطي',
+        formFieldInputPlaceholder__emailAddress: 'أدخل عنوان بريدك الإلكتروني',
+        formFieldInputPlaceholder__emailAddress_username: 'أدخل البريد الإلكتروني أو اسم المستخدم',
+        formFieldInputPlaceholder__firstName: 'الاسم الأول',
+        formFieldInputPlaceholder__lastName: 'اسم العائلة',
+        formFieldInputPlaceholder__password: 'أدخل كلمة المرور',
+        formFieldInputPlaceholder__phoneNumber: 'أدخل رقم هاتفك',
+        formFieldInputPlaceholder__signUpPassword: 'أنشئ كلمة مرور',
+        formFieldInputPlaceholder__username: 'أدخل اسم المستخدم',
+        formFieldInput__emailAddress_format: 'مثال للتنسيق: name@example.com',
+        signIn: {
+          ...arSA.signIn,
+          alternativePhoneCodeProvider: {
+            ...arSA.signIn?.alternativePhoneCodeProvider,
+            formTitle: 'رمز التحقق',
+            resendButton: 'لم يصلك الرمز؟ أعد الإرسال',
+            subtitle: 'للمتابعة إلى {{applicationName}}',
+            title: 'تحقق من {{provider}}',
+          },
+          emailLink: {
+            ...arSA.signIn?.emailLink,
+            verifiedTransferable: {
+              ...arSA.signIn?.emailLink?.verifiedTransferable,
+              subtitle: 'ارجع إلى علامة التبويب الأصلية للمتابعة',
+              title: 'تم التحقق من البريد الإلكتروني',
+            },
+          },
+          enterpriseConnections: {
+            ...arSA.signIn?.enterpriseConnections,
+            subtitle: 'اختر حساب المؤسسة الذي تريد المتابعة باستخدامه.',
+            title: 'اختر حساب مؤسستك',
+          },
+          passwordCompromised: {
+            ...arSA.signIn?.passwordCompromised,
+            title: 'كلمة المرور مخترقة',
+          },
+          passwordUntrusted: {
+            ...arSA.signIn?.passwordUntrusted,
+            title: 'كلمة المرور غير موثوقة',
+          },
+          protectCheck: {
+            ...arSA.signIn?.protectCheck,
+            loading: 'جارٍ التحميل…',
+            retryButton: 'حاول مرة أخرى',
+            subtitle: 'يرجى الانتظار بينما نتحقق من طلبك.',
+            title: 'جارٍ التحقق من طلبك',
+          },
+          start: {
+            ...arSA.signIn?.start,
+            actionLink__join_waitlist: 'انضم إلى قائمة الانتظار',
+            actionText__join_waitlist: 'هل تريد الوصول المبكر؟',
+            alternativePhoneCodeProvider: {
+              ...arSA.signIn?.start?.alternativePhoneCodeProvider,
+              actionLink: 'استخدم طريقة أخرى',
+              label: 'رقم هاتف {{provider}}',
+              subtitle: 'أدخل رقم هاتفك للحصول على رمز تحقق عبر {{provider}}.',
+              title: 'سجّل الدخول إلى {{applicationName}} باستخدام {{provider}}',
+            },
+            title: 'مرحبًا بعودتك',
+            titleCombined: 'المتابعة إلى {{applicationName}}',
+            subtitle: 'سجّل الدخول للحفاظ على إيقاع تعلّمك.',
+          },
+        },
+        signUp: {
+          ...arSA.signUp,
+          alternativePhoneCodeProvider: {
+            ...arSA.signUp?.alternativePhoneCodeProvider,
+            resendButton: 'لم يصلك الرمز؟ أعد الإرسال',
+            subtitle: 'أدخل رمز التحقق المرسل إلى {{provider}}',
+            title: 'تحقق من {{provider}}',
+          },
+          enterpriseConnections: {
+            ...arSA.signUp?.enterpriseConnections,
+            subtitle: 'اختر حساب المؤسسة الذي تريد المتابعة باستخدامه.',
+            title: 'اختر حساب مؤسستك',
+          },
+          legalConsent: {
+            ...arSA.signUp?.legalConsent,
+            checkbox: {
+              ...arSA.signUp?.legalConsent?.checkbox,
+              label__onlyPrivacyPolicy: 'أوافق على {{ privacyPolicyLink || link("سياسة الخصوصية") }}',
+              label__onlyTermsOfService: 'أوافق على {{ termsOfServiceLink || link("شروط الخدمة") }}',
+              label__termsOfServiceAndPrivacyPolicy: 'أوافق على {{ termsOfServiceLink || link("شروط الخدمة") }} و{{ privacyPolicyLink || link("سياسة الخصوصية") }}',
+            },
+            continue: {
+              ...arSA.signUp?.legalConsent?.continue,
+              subtitle: 'يرجى قراءة الشروط والموافقة عليها للمتابعة',
+              title: 'الموافقة القانونية',
+            },
+          },
+          protectCheck: {
+            ...arSA.signUp?.protectCheck,
+            loading: 'جارٍ التحميل…',
+            retryButton: 'حاول مرة أخرى',
+            subtitle: 'يرجى الانتظار بينما نتحقق من طلبك.',
+            title: 'جارٍ التحقق من طلبك',
+          },
+          restrictedAccess: {
+            ...arSA.signUp?.restrictedAccess,
+            actionLink: 'تسجيل الدخول',
+            actionText: 'لديك حساب بالفعل؟',
+            blockButton__emailSupport: 'راسل الدعم',
+            blockButton__joinWaitlist: 'انضم إلى قائمة الانتظار',
+            subtitle: 'إنشاء الحسابات متوقف حاليًا. إذا كنت تعتقد أن لديك صلاحية الوصول، يرجى التواصل مع الدعم.',
+            subtitleWaitlist: 'إنشاء الحسابات متوقف حاليًا. انضم إلى قائمة الانتظار لتكون أول من يعرف عند إطلاق الخدمة.',
+            title: 'الوصول مقيّد',
+          },
+          start: {
+            ...arSA.signUp?.start,
+            actionLink__use_email: 'استخدم البريد الإلكتروني بدلًا من ذلك',
+            actionLink__use_phone: 'استخدم الهاتف بدلًا من ذلك',
+            alternativePhoneCodeProvider: {
+              ...arSA.signUp?.start?.alternativePhoneCodeProvider,
+              actionLink: 'استخدم طريقة أخرى',
+              label: 'رقم هاتف {{provider}}',
+              subtitle: 'أدخل رقم هاتفك للحصول على رمز تحقق عبر {{provider}}.',
+              title: 'سجّل حسابًا في {{applicationName}} باستخدام {{provider}}',
+            },
+            title: 'أنشئ حسابك',
+            subtitle: 'احفظ تقدمك في قائمة أكسفورد 3000 أينما كنت.',
+            subtitleCombined: 'مرحبًا! املأ التفاصيل للبدء.',
+          },
+        },
+      }
+    : {
+        signIn: {
+          start: {
+            title: 'Welcome back',
+            subtitle: 'Sign in to keep your learning rhythm.',
+          },
+        },
+        signUp: {
+          start: {
+            title: 'Create your account',
+            subtitle: 'Save your Oxford 3000 progress anywhere.',
+          },
+        },
+      };
+
+  useEffect(() => {
+    const developmentLabel = language === 'ar' ? 'وضع التطوير' : 'Development mode';
+    const oppositeLabel = language === 'ar' ? 'Development mode' : 'وضع التطوير';
+    const replaceDevelopmentLabel = () => {
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      let node = walker.nextNode();
+      while (node) {
+        if (node.textContent?.trim() === oppositeLabel) {
+          node.textContent = developmentLabel;
+        }
+        node = walker.nextNode();
+      }
+    };
+
+    replaceDevelopmentLabel();
+    const observer = new MutationObserver(replaceDevelopmentLabel);
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [language]);
 
   return (
     <ClerkProvider
@@ -835,10 +1240,7 @@ function ClerkProviderWithRoutes() {
       appearance={clerkAppearance}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}
-      localization={{
-        signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to keep your learning rhythm.' } },
-        signUp: { start: { title: 'Create your account', subtitle: 'Save your Oxford 3000 progress anywhere.' } },
-      }}
+      localization={clerkLocalization}
       routerPush={(to) => setLocation(stripBase(to))}
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
@@ -859,7 +1261,33 @@ function ClerkProviderWithRoutes() {
 }
 
 function App() {
-  return <WouterRouter base={basePath}><ClerkProviderWithRoutes /></WouterRouter>;
+  const [language, setLanguage] = useState<Language>(() => {
+    const requestedLanguage = new URLSearchParams(window.location.search).get('lang');
+    if (requestedLanguage === 'ar' || requestedLanguage === 'en') return requestedLanguage;
+    try {
+      return window.localStorage.getItem('wordroom-language') === 'ar' ? 'ar' : 'en';
+    } catch {
+      return 'en';
+    }
+  });
+
+  useEffect(() => {
+    const direction = language === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = language === 'ar' ? 'ar' : 'en';
+    document.documentElement.dir = direction;
+    document.body.dir = direction;
+    try {
+      window.localStorage.setItem('wordroom-language', language);
+    } catch {
+      // Language preference is optional when storage is unavailable.
+    }
+  }, [language]);
+
+  return (
+    <LanguageContext.Provider value={{ language, setLanguage, t: translations[language] }}>
+      <WouterRouter base={basePath}><ClerkProviderWithRoutes /></WouterRouter>
+    </LanguageContext.Provider>
+  );
 }
 
 export default App;
