@@ -1,14 +1,73 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ClerkProvider, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
+import { publishableKeyFromHost } from '@clerk/react/internal';
+import { shadcn } from '@clerk/themes';
+import { getGetProgressQueryKey, useGetProgress, useSaveProgress, type ProgressInput } from '@workspace/api-client-react';
 import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Check, ChevronDown, Command, Layers3, ListFilter, Menu, Pencil, RotateCcw, Save, Search, Shuffle, Sparkles, Volume2, X } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { oxford3000 } from './oxford3000';
 import NotFound from '@/pages/not-found';
-import { Route, Switch, Router as WouterRouter } from 'wouter';
+import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 
 const queryClient = new QueryClient();
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+
+if (!clerkPubKey) {
+  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in the app environment.');
+}
+
+const clerkAppearance = {
+  theme: shadcn,
+  cssLayerName: 'clerk',
+  options: {
+    logoPlacement: 'inside' as const,
+    logoLinkUrl: basePath || '/',
+    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+  },
+  variables: {
+    colorPrimary: '#24635f',
+    colorForeground: '#202a40',
+    colorMutedForeground: '#71776f',
+    colorDanger: '#a04b39',
+    colorBackground: '#fbf8f1',
+    colorInput: '#f6f2e9',
+    colorInputForeground: '#202a40',
+    colorNeutral: '#ded8ca',
+    fontFamily: 'DM Sans, Noto Sans Arabic, sans-serif',
+    borderRadius: '0.9rem',
+  },
+  elements: {
+    rootBox: 'w-full flex justify-center',
+    cardBox: 'bg-[#fbf8f1] rounded-2xl w-[440px] max-w-full overflow-hidden',
+    card: '!shadow-none !border-0 !bg-transparent !rounded-none',
+    footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
+    headerTitle: 'text-[#202a40]',
+    headerSubtitle: 'text-[#71776f]',
+    socialButtonsBlockButtonText: 'text-[#202a40]',
+    formFieldLabel: 'text-[#202a40]',
+    footerActionLink: 'text-[#24635f]',
+    footerActionText: 'text-[#71776f]',
+    dividerText: 'text-[#71776f]',
+    formFieldSuccessText: 'text-[#24635f]',
+    alertText: 'text-[#a04b39]',
+    logoBox: 'h-10',
+    logoImage: 'h-10',
+    socialButtonsBlockButton: 'border-[#ded8ca] bg-[#f6f2e9]',
+    formButtonPrimary: 'bg-[#24635f] hover:bg-[#1c514e]',
+    formFieldInput: 'border-[#ded8ca] bg-[#f6f2e9] text-[#202a40]',
+    footerAction: 'bg-transparent',
+    dividerLine: 'bg-[#ded8ca]',
+    alert: 'border-[#f7d8cd] bg-[#fff4ef]',
+    otpCodeFieldInput: 'border-[#ded8ca] bg-[#f6f2e9] text-[#202a40]',
+    formFieldRow: 'text-[#202a40]',
+    main: 'bg-[#fbf8f1]',
+  },
+};
 
 const levelOptions = ['All levels', 'A1', 'A2', 'B1', 'B2'];
 const typeOptions = ['All parts', 'Noun', 'Verb', 'Adjective', 'Adverb', 'Preposition'];
@@ -48,9 +107,13 @@ function localDateKey(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-function readReviewedIds() {
+function getStorageKey(key: string, userId?: string) {
+  return userId ? `${key}:${userId}` : key;
+}
+
+function readReviewedIds(userId?: string) {
   try {
-    const saved = JSON.parse(window.localStorage.getItem(reviewedStorageKey) ?? '[]') as unknown;
+    const saved = JSON.parse(window.localStorage.getItem(getStorageKey(reviewedStorageKey, userId)) ?? '[]') as unknown;
     if (!Array.isArray(saved)) return new Set<number>();
     const validIds = new Set<number>(oxford3000.map((word) => word.id));
     return new Set(saved.filter((id): id is number => typeof id === 'number' && validIds.has(id)));
@@ -59,9 +122,9 @@ function readReviewedIds() {
   }
 }
 
-function readReviewDates() {
+function readReviewDates(userId?: string) {
   try {
-    const saved = JSON.parse(window.localStorage.getItem(reviewDatesStorageKey) ?? '{}') as unknown;
+    const saved = JSON.parse(window.localStorage.getItem(getStorageKey(reviewDatesStorageKey, userId)) ?? '{}') as unknown;
     if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {};
     return Object.fromEntries(Object.entries(saved).filter(([, date]) => typeof date === 'string')) as Record<string, string>;
   } catch {
@@ -96,6 +159,15 @@ function getCurrentStreak(reviewDates: Record<string, string>) {
     cursor.setDate(cursor.getDate() - 1);
   }
   return streak;
+}
+
+function getCompletedDayNumbers(days: EditableWord[][], reviewed: Set<number>) {
+  return days.reduce<number[]>((completed, dayWords, dayIndex) => {
+    if (dayWords.length > 0 && dayWords.every((word) => reviewed.has(word.id))) {
+      completed.push(dayIndex + 1);
+    }
+    return completed;
+  }, []);
 }
 
 function Logo() {
@@ -164,6 +236,37 @@ function Sidebar({ view, setView, mobileOpen, closeMobile, onReset, reviewedToda
   );
 }
 
+function AuthControls() {
+  const { isLoaded, isSignedIn, user } = useUser();
+  const { signOut } = useClerk();
+  const [, setLocation] = useLocation();
+
+  if (!isLoaded) {
+    return <div className="h-9 w-24 animate-pulse rounded-full bg-[#e9e3d7]" aria-label="Loading account" />;
+  }
+
+  if (!isSignedIn) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <button type="button" data-testid="button-login" onClick={() => setLocation('/sign-in')} className="rounded-full px-3 py-2 text-xs font-semibold text-[#5f675f] transition-colors hover:bg-[#e9e3d7] hover:text-[#202a40]">Log in</button>
+        <button type="button" data-testid="button-sign-up" onClick={() => setLocation('/sign-up')} className="rounded-full bg-[#202a40] px-3.5 py-2 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852]">Sign up</button>
+      </div>
+    );
+  }
+
+  const initials = `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? user.primaryEmailAddress?.emailAddress?.[0] ?? 'W'}`.toUpperCase();
+  return (
+    <div className="flex items-center gap-2">
+      <div className="hidden text-right sm:block">
+        <div className="max-w-[130px] truncate text-xs font-semibold text-[#202a40]">{user.firstName ?? user.primaryEmailAddress?.emailAddress}</div>
+        <div className="font-mono-custom text-[9px] uppercase tracking-[.12em] text-[#858982]">Synced account</div>
+      </div>
+      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e6c94d] bg-[#f3d24f] text-xs font-bold text-[#202a40]" data-testid="avatar-user">{initials}</div>
+      <button type="button" data-testid="button-logout" onClick={() => signOut({ redirectUrl: basePath || '/' })} className="rounded-full px-2.5 py-2 text-xs font-semibold text-[#71776f] transition-colors hover:bg-[#e9e3d7] hover:text-[#202a40]">Log out</button>
+    </div>
+  );
+}
+
 function TopBar({ view, setView, openMenu }: { view: AppView; setView: (view: AppView) => void; openMenu: () => void }) {
   const formattedDate = new Intl.DateTimeFormat('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
   return (
@@ -176,7 +279,7 @@ function TopBar({ view, setView, openMenu }: { view: AppView; setView: (view: Ap
         <button type="button" data-testid="button-top-study" onClick={() => setView('study')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'study' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>Study</button>
         <button type="button" data-testid="button-top-browse" onClick={() => setView('browse')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'browse' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>Browse</button>
         <button type="button" data-testid="button-top-all-days" onClick={() => setView('all-days')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'all-days' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>All Days</button>
-        <div className="ml-2 flex h-9 w-9 items-center justify-center rounded-full border border-[#ded8ca] bg-[#e9dfce] text-xs font-bold text-[#202a40]" data-testid="avatar-user">AM</div>
+        <AuthControls />
       </div>
     </header>
   );
@@ -430,7 +533,7 @@ function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, markReviewe
   );
 }
 
-function AllDaysOverview({ days, reviewed, onSelectDay }: { days: EditableWord[][]; reviewed: Set<number>; onSelectDay: (dayIndex: number) => void }) {
+function AllDaysOverview({ days, reviewed, completedDays, onSelectDay }: { days: EditableWord[][]; reviewed: Set<number>; completedDays: Set<number>; onSelectDay: (dayIndex: number) => void }) {
   return (
     <section className="animate-rise" data-testid="section-all-days">
       <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
@@ -447,6 +550,7 @@ function AllDaysOverview({ days, reviewed, onSelectDay }: { days: EditableWord[]
       <div className="mt-9 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {days.map((dayWords, dayIndex) => {
           const reviewedCount = dayWords.filter((word) => reviewed.has(word.id)).length;
+          const isComplete = completedDays.has(dayIndex + 1) || (dayWords.length > 0 && reviewedCount === dayWords.length);
           const firstWord = dayWords[0]?.word ?? '';
           const lastWord = dayWords[dayWords.length - 1]?.word ?? '';
           return (
@@ -460,7 +564,11 @@ function AllDaysOverview({ days, reviewed, onSelectDay }: { days: EditableWord[]
               <div className="absolute right-0 top-0 h-1 w-14 bg-[#f3d24f] transition-all duration-200 group-hover:w-24" />
               <div className="flex items-center justify-between">
                 <span className="font-mono-custom text-[10px] uppercase tracking-[.17em] text-[#858982]">Daily set</span>
-                <ArrowRight size={15} className="text-[#b7b8b0] transition-transform group-hover:translate-x-1 group-hover:text-[#ef7657]" />
+                {isComplete ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#d9eee9] px-2 py-1 font-mono-custom text-[9px] uppercase tracking-[.08em] text-[#24635f]"><Check size={11} /> Complete</span>
+                ) : (
+                  <ArrowRight size={15} className="text-[#b7b8b0] transition-transform group-hover:translate-x-1 group-hover:text-[#ef7657]" />
+                )}
               </div>
               <div className="mt-5 flex items-end justify-between gap-3">
                 <h2 className="font-display text-[29px] leading-none tracking-[-.04em] text-[#202a40]">Day {dayIndex + 1}</h2>
@@ -521,15 +629,26 @@ function AllDaysDetail({ dayNumber, words, reviewed, onBack }: { dayNumber: numb
   );
 }
 
-function AllDaysView({ days, reviewed, selectedDayIndex, onSelectDay, onBack }: { days: EditableWord[][]; reviewed: Set<number>; selectedDayIndex: number | null; onSelectDay: (dayIndex: number) => void; onBack: () => void }) {
+function AllDaysView({ days, reviewed, completedDays, selectedDayIndex, onSelectDay, onBack }: { days: EditableWord[][]; reviewed: Set<number>; completedDays: Set<number>; selectedDayIndex: number | null; onSelectDay: (dayIndex: number) => void; onBack: () => void }) {
   const selectedDay = selectedDayIndex === null ? undefined : days[selectedDayIndex];
   if (selectedDay && selectedDayIndex !== null) {
     return <AllDaysDetail dayNumber={selectedDayIndex + 1} words={selectedDay} reviewed={reviewed} onBack={onBack} />;
   }
-  return <AllDaysOverview days={days} reviewed={reviewed} onSelectDay={onSelectDay} />;
+  return <AllDaysOverview days={days} reviewed={reviewed} completedDays={completedDays} onSelectDay={onSelectDay} />;
 }
 
 function Home() {
+  const { isLoaded: authLoaded, isSignedIn, user } = useUser();
+  const progressQuery = useGetProgress({
+    query: { queryKey: getGetProgressQueryKey(), enabled: authLoaded && !!isSignedIn, staleTime: 0 },
+  });
+  const saveProgressMutation = useSaveProgress({
+    mutation: {
+      onSuccess: (savedProgress) => {
+        queryClient.setQueryData(getGetProgressQueryKey(), savedProgress);
+      },
+    },
+  });
   const [view, setView] = useState<AppView>('study');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -539,12 +658,65 @@ function Home() {
   const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
   const [reviewed, setReviewed] = useState<Set<number>>(readReviewedIds);
   const [reviewDates, setReviewDates] = useState<Record<string, string>>(readReviewDates);
+  const [completedDays, setCompletedDays] = useState<Set<number>>(new Set());
   const [wordOverrides, setWordOverrides] = useState<Record<string, WordOverrides>>(readWordOverrides);
+  const authUserRef = useRef<string | null | undefined>(undefined);
+  const hydratedUserRef = useRef<string | null>(null);
   const today = localDateKey();
   const reviewedToday = Object.values(reviewDates).filter((date) => date === today).length;
   const currentStreak = getCurrentStreak(reviewDates);
   const editableWords = useMemo(() => sourceWords.map((word) => ({ ...word, ...(wordOverrides[word.id] ?? {}) })), [wordOverrides]);
   const days = useMemo(() => splitIntoDays(editableWords), [editableWords]);
+  useEffect(() => {
+    if (!authLoaded) return;
+    const userId = isSignedIn ? user?.id ?? null : null;
+    if (authUserRef.current === userId) return;
+
+    authUserRef.current = userId;
+    hydratedUserRef.current = null;
+    if (userId) {
+      const mergedReviewed = new Set([...readReviewedIds(userId), ...readReviewedIds()]);
+      const mergedReviewDates = { ...readReviewDates(userId), ...readReviewDates() };
+      setReviewed(mergedReviewed);
+      setReviewDates(mergedReviewDates);
+      setCompletedDays(new Set(getCompletedDayNumbers(days, mergedReviewed)));
+      window.localStorage.setItem(getStorageKey(reviewedStorageKey, userId), JSON.stringify([...mergedReviewed]));
+      window.localStorage.setItem(getStorageKey(reviewDatesStorageKey, userId), JSON.stringify(mergedReviewDates));
+      window.localStorage.removeItem(reviewedStorageKey);
+      window.localStorage.removeItem(reviewDatesStorageKey);
+    } else {
+      const guestReviewed = readReviewedIds();
+      setReviewed(guestReviewed);
+      setReviewDates(readReviewDates());
+      setCompletedDays(new Set(getCompletedDayNumbers(days, guestReviewed)));
+    }
+  }, [authLoaded, isSignedIn, user?.id, days]);
+
+  useEffect(() => {
+    if (!authLoaded || !isSignedIn || !user?.id || progressQuery.isLoading || !progressQuery.data || hydratedUserRef.current === user.id) return;
+
+    const serverReviewed = new Set(progressQuery.data.completedWordIds.filter((id) => sourceWords.some((word) => word.id === id)));
+    const mergedReviewed = new Set([...reviewed, ...serverReviewed]);
+    const mergedCompletedDays = new Set([
+      ...progressQuery.data.completedDayNumbers,
+      ...getCompletedDayNumbers(days, mergedReviewed),
+    ]);
+    const payload: ProgressInput = {
+      completedWordIds: [...mergedReviewed].sort((a, b) => a - b),
+      completedDayNumbers: [...mergedCompletedDays].sort((a, b) => a - b),
+    };
+    setReviewed(mergedReviewed);
+    setCompletedDays(mergedCompletedDays);
+    window.localStorage.setItem(getStorageKey(reviewedStorageKey, user.id), JSON.stringify(payload.completedWordIds));
+    window.localStorage.setItem(getStorageKey(reviewDatesStorageKey, user.id), JSON.stringify(reviewDates));
+    if (
+      payload.completedWordIds.length !== progressQuery.data.completedWordIds.length ||
+      payload.completedDayNumbers.length !== progressQuery.data.completedDayNumbers.length
+    ) {
+      saveProgressMutation.mutate({ data: payload });
+    }
+    hydratedUserRef.current = user.id;
+  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, days, reviewDates, saveProgressMutation]);
   const filteredWords = useMemo(() => {
     const normalized = search.trim().toLocaleLowerCase();
     return editableWords.filter((word) => {
@@ -559,12 +731,23 @@ function Home() {
     setReviewed((existing) => {
       const next = new Set(existing);
       next.add(id);
-      window.localStorage.setItem(reviewedStorageKey, JSON.stringify([...next]));
+      const completedDayNumbers = getCompletedDayNumbers(days, next);
+      const userId = isSignedIn ? user?.id : undefined;
+      window.localStorage.setItem(getStorageKey(reviewedStorageKey, userId), JSON.stringify([...next]));
+      setCompletedDays(new Set(completedDayNumbers));
+      if (userId) {
+        saveProgressMutation.mutate({
+          data: {
+            completedWordIds: [...next].sort((a, b) => a - b),
+            completedDayNumbers,
+          },
+        });
+      }
       return next;
     });
     setReviewDates((existing) => {
       const next = { ...existing, [id]: today };
-      window.localStorage.setItem(reviewDatesStorageKey, JSON.stringify(next));
+      window.localStorage.setItem(getStorageKey(reviewDatesStorageKey, isSignedIn ? user?.id : undefined), JSON.stringify(next));
       return next;
     });
   };
@@ -581,8 +764,15 @@ function Home() {
   const resetSession = () => {
     setReviewed(new Set());
     setReviewDates({});
-    window.localStorage.removeItem(reviewedStorageKey);
-    window.localStorage.removeItem(reviewDatesStorageKey);
+    setCompletedDays(new Set());
+    const userId = isSignedIn ? user?.id : undefined;
+    window.localStorage.removeItem(getStorageKey(reviewedStorageKey, userId));
+    window.localStorage.removeItem(getStorageKey(reviewDatesStorageKey, userId));
+    if (userId) {
+      saveProgressMutation.mutate({
+        data: { completedWordIds: [], completedDayNumbers: [] },
+      });
+    }
   };
   const nextMilestone = reviewed.size >= oxford3000.length ? oxford3000.length : Math.min(oxford3000.length, Math.ceil((reviewed.size + 1) / 200) * 200);
   const wordsToMilestone = Math.max(0, nextMilestone - reviewed.size);
@@ -593,7 +783,7 @@ function Home() {
       <main className="ml-0 px-5 pb-16 pt-9 md:ml-[264px] md:px-10 md:pt-12">
         <div className="mx-auto max-w-[1250px]">
           {view === 'all-days' ? (
-            <AllDaysView days={days} reviewed={reviewed} selectedDayIndex={selectedDayIndex} onSelectDay={selectDay} onBack={() => setSelectedDayIndex(null)} />
+            <AllDaysView days={days} reviewed={reviewed} completedDays={completedDays} selectedDayIndex={selectedDayIndex} onSelectDay={selectDay} onBack={() => setSelectedDayIndex(null)} />
           ) : (
             <>
           <div className="animate-rise mb-9 flex flex-col justify-between gap-5 md:flex-row md:items-end">
@@ -615,8 +805,61 @@ function Router() {
   return <Switch><Route path="/" component={Home} /><Route component={NotFound} /></Switch>;
 }
 
+function stripBase(path: string) {
+  return basePath && path.startsWith(basePath) ? path.slice(basePath.length) || '/' : path;
+}
+
+function SignInPage() {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-[#f6f2e9] px-4 py-8">
+      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
+    </div>
+  );
+}
+
+function SignUpPage() {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-[#f6f2e9] px-4 py-8">
+      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+    </div>
+  );
+}
+
+function ClerkProviderWithRoutes() {
+  const [, setLocation] = useLocation();
+
+  return (
+    <ClerkProvider
+      publishableKey={clerkPubKey}
+      proxyUrl={clerkProxyUrl}
+      appearance={clerkAppearance}
+      signInUrl={`${basePath}/sign-in`}
+      signUpUrl={`${basePath}/sign-up`}
+      localization={{
+        signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to keep your learning rhythm.' } },
+        signUp: { start: { title: 'Create your account', subtitle: 'Save your Oxford 3000 progress anywhere.' } },
+      }}
+      routerPush={(to) => setLocation(stripBase(to))}
+      routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+    >
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <ErrorBoundary>
+            <Switch>
+              <Route path="/sign-in/*?" component={SignInPage} />
+              <Route path="/sign-up/*?" component={SignUpPage} />
+              <Route component={Router} />
+            </Switch>
+          </ErrorBoundary>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
+  );
+}
+
 function App() {
-  return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><ErrorBoundary><Router /></ErrorBoundary></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>;
+  return <WouterRouter base={basePath}><ClerkProviderWithRoutes /></WouterRouter>;
 }
 
 export default App;

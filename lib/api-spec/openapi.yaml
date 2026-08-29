@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: progress
+    description: Authenticated learning progress
 paths:
   /healthz:
     get:
@@ -24,7 +26,51 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /progress:
+    get:
+      operationId: getProgress
+      tags: [progress]
+      summary: Get the signed-in user's progress
+      security:
+        - clerkSession: []
+      responses:
+        "200":
+          description: Current progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Progress"
+        "401":
+          description: Authentication required
+    put:
+      operationId: saveProgress
+      tags: [progress]
+      summary: Save the signed-in user's progress
+      security:
+        - clerkSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProgressInput"
+      responses:
+        "200":
+          description: Saved progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Progress"
+        "400":
+          description: Invalid progress payload
+        "401":
+          description: Authentication required
 components:
+  securitySchemes:
+    clerkSession:
+      type: apiKey
+      in: cookie
+      name: __session
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +79,44 @@ components:
           type: string
       required:
         - status
+    Progress:
+      type: object
+      properties:
+        completedWordIds:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 3000
+        completedDayNumbers:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 300
+      required:
+        - completedWordIds
+        - completedDayNumbers
+    ProgressInput:
+      type: object
+      properties:
+        completedWordIds:
+          type: array
+          maxItems: 3000
+          uniqueItems: true
+          items:
+            type: integer
+            minimum: 1
+            maximum: 3000
+        completedDayNumbers:
+          type: array
+          maxItems: 300
+          uniqueItems: true
+          items:
+            type: integer
+            minimum: 1
+            maximum: 300
+      required:
+        - completedWordIds
+        - completedDayNumbers
 
