@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, Command, Layers3, ListFilter, Menu, Pencil, RotateCcw, Save, Search, Shuffle, Sparkles, Volume2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Check, ChevronDown, Command, Layers3, ListFilter, Menu, Pencil, RotateCcw, Save, Search, Shuffle, Sparkles, Volume2, X } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -28,8 +28,18 @@ type EditableWord = {
 };
 
 type WordOverrides = Partial<Omit<EditableWord, 'id'>>;
+type AppView = 'study' | 'browse' | 'all-days';
 
 const sourceWords: EditableWord[] = oxford3000.map((word) => ({ ...word }));
+const wordsPerDay = 12;
+
+function splitIntoDays(words: EditableWord[]) {
+  const days: EditableWord[][] = [];
+  for (let start = 0; start < words.length; start += wordsPerDay) {
+    days.push(words.slice(start, start + wordsPerDay));
+  }
+  return days;
+}
 
 function localDateKey(date = new Date()) {
   const year = date.getFullYear();
@@ -103,9 +113,10 @@ function Logo() {
   );
 }
 
-function Sidebar({ view, setView, mobileOpen, closeMobile, onReset, reviewedToday }: { view: 'study' | 'browse'; setView: (view: 'study' | 'browse') => void; mobileOpen: boolean; closeMobile: () => void; onReset: () => void; reviewedToday: number }) {
+function Sidebar({ view, setView, mobileOpen, closeMobile, onReset, reviewedToday }: { view: AppView; setView: (view: AppView) => void; mobileOpen: boolean; closeMobile: () => void; onReset: () => void; reviewedToday: number }) {
   const nav = [
     { id: 'study' as const, label: 'Study room', arabic: 'غرفة الدراسة', icon: Sparkles },
+    { id: 'all-days' as const, label: 'All Days', arabic: 'جميع الأيام', icon: CalendarDays },
     { id: 'browse' as const, label: 'Word library', arabic: 'مكتبة الكلمات', icon: Layers3 },
   ];
   return (
@@ -153,7 +164,7 @@ function Sidebar({ view, setView, mobileOpen, closeMobile, onReset, reviewedToda
   );
 }
 
-function TopBar({ view, setView, openMenu }: { view: 'study' | 'browse'; setView: (view: 'study' | 'browse') => void; openMenu: () => void }) {
+function TopBar({ view, setView, openMenu }: { view: AppView; setView: (view: AppView) => void; openMenu: () => void }) {
   const formattedDate = new Intl.DateTimeFormat('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
   return (
     <header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-[#ded8ca] bg-[#f6f2e9]/90 px-5 backdrop-blur-md md:ml-[264px] md:px-10">
@@ -164,6 +175,7 @@ function TopBar({ view, setView, openMenu }: { view: 'study' | 'browse'; setView
       <div className="flex items-center gap-2">
         <button type="button" data-testid="button-top-study" onClick={() => setView('study')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'study' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>Study</button>
         <button type="button" data-testid="button-top-browse" onClick={() => setView('browse')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'browse' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>Browse</button>
+        <button type="button" data-testid="button-top-all-days" onClick={() => setView('all-days')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'all-days' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>All Days</button>
         <div className="ml-2 flex h-9 w-9 items-center justify-center rounded-full border border-[#ded8ca] bg-[#e9dfce] text-xs font-bold text-[#202a40]" data-testid="avatar-user">AM</div>
       </div>
     </header>
@@ -418,13 +430,113 @@ function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, markReviewe
   );
 }
 
+function AllDaysOverview({ days, reviewed, onSelectDay }: { days: EditableWord[][]; reviewed: Set<number>; onSelectDay: (dayIndex: number) => void }) {
+  return (
+    <section className="animate-rise" data-testid="section-all-days">
+      <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+        <div>
+          <div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.21em] text-[#24635f]"><span className="h-2 w-2 rounded-full bg-[#ef7657]" /> A steady path through every word</div>
+          <h1 className="mt-3 max-w-[680px] font-display text-[clamp(2.6rem,5.3vw,4.7rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-all-days">All days, one <em className="text-[#24635f]">steady rhythm.</em></h1>
+          <p className="mt-4 max-w-[510px] text-[14px] leading-relaxed text-[#71776f]">Your complete vocabulary journey, arranged in focused daily sets of twelve words.</p>
+        </div>
+        <div className="text-left md:text-right">
+          <div className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">Your daily map</div>
+          <div className="mt-1 font-display text-[31px] leading-none text-[#202a40]">{days.length} <span className="font-sans text-sm font-medium text-[#71776f]">days</span></div>
+        </div>
+      </div>
+      <div className="mt-9 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {days.map((dayWords, dayIndex) => {
+          const reviewedCount = dayWords.filter((word) => reviewed.has(word.id)).length;
+          const firstWord = dayWords[0]?.word ?? '';
+          const lastWord = dayWords[dayWords.length - 1]?.word ?? '';
+          return (
+            <button
+              type="button"
+              key={dayIndex}
+              data-testid={`button-all-days-day-${dayIndex + 1}`}
+              onClick={() => onSelectDay(dayIndex)}
+              className="group relative overflow-hidden rounded-2xl border border-[#ded8ca] bg-[#fbf8f1] p-5 text-left shadow-[0_2px_5px_rgba(31,41,55,.03)] transition-all duration-200 hover:-translate-y-1 hover:border-[#24635f] hover:shadow-[0_10px_22px_rgba(31,41,55,.08)]"
+            >
+              <div className="absolute right-0 top-0 h-1 w-14 bg-[#f3d24f] transition-all duration-200 group-hover:w-24" />
+              <div className="flex items-center justify-between">
+                <span className="font-mono-custom text-[10px] uppercase tracking-[.17em] text-[#858982]">Daily set</span>
+                <ArrowRight size={15} className="text-[#b7b8b0] transition-transform group-hover:translate-x-1 group-hover:text-[#ef7657]" />
+              </div>
+              <div className="mt-5 flex items-end justify-between gap-3">
+                <h2 className="font-display text-[29px] leading-none tracking-[-.04em] text-[#202a40]">Day {dayIndex + 1}</h2>
+                <span className="rounded-full bg-[#e9e3d7] px-2.5 py-1 font-mono-custom text-[9px] text-[#666d65]">{dayWords.length} words</span>
+              </div>
+              <p className="mt-4 truncate text-xs text-[#71776f]" title={`${firstWord} — ${lastWord}`}>{firstWord} <span className="text-[#c6bfb1]">to</span> {lastWord}</p>
+              <div className="mt-5 flex items-center gap-3 border-t border-[#e8e2d7] pt-4">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e9e3d7]">
+                  <div className="h-full rounded-full bg-[#24635f] transition-all duration-500" style={{ width: `${dayWords.length ? (reviewedCount / dayWords.length) * 100 : 0}%` }} />
+                </div>
+                <span className="font-mono-custom text-[10px] text-[#858982]">{reviewedCount}/{dayWords.length}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function AllDaysDetail({ dayNumber, words, reviewed, onBack }: { dayNumber: number; words: EditableWord[]; reviewed: Set<number>; onBack: () => void }) {
+  const reviewedCount = words.filter((word) => reviewed.has(word.id)).length;
+  return (
+    <section className="animate-rise" data-testid="section-all-days-detail">
+      <button type="button" data-testid="button-all-days-back" onClick={onBack} className="inline-flex items-center gap-2 rounded-full border border-[#d6d1c6] bg-[#fbf8f1] px-3.5 py-2 text-xs font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]">
+        <ArrowLeft size={14} /> All Days
+      </button>
+      <div className="mt-8 flex flex-col justify-between gap-5 border-b border-[#ded8ca] pb-7 md:flex-row md:items-end">
+        <div>
+          <div className="font-mono-custom text-[10px] uppercase tracking-[.19em] text-[#858982]">Daily vocabulary set</div>
+          <h1 className="mt-2 font-display text-[clamp(2.8rem,5vw,4.8rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-day-detail">Day {dayNumber}</h1>
+          <p className="mt-3 font-arabic text-sm text-[#71776f]" dir="rtl">اليوم {dayNumber} · {words.length} كلمة</p>
+        </div>
+        <div className="rounded-2xl border border-[#ded8ca] bg-[#f5edda] px-4 py-3 text-left md:text-right">
+          <div className="font-mono-custom text-[9px] uppercase tracking-[.16em] text-[#858982]">Progress</div>
+          <div className="mt-1 font-display text-2xl text-[#202a40]">{reviewedCount} <span className="font-sans text-xs text-[#71776f]">/ {words.length} reviewed</span></div>
+        </div>
+      </div>
+      <div className="mt-7 overflow-hidden rounded-2xl border border-[#ded8ca] bg-[#fbf8f1]" data-testid="list-all-days-words">
+        {words.map((word, wordIndex) => (
+          <article key={word.id} data-testid={`card-all-days-word-${word.id}`} className="grid gap-3 border-b border-[#e8e2d7] px-4 py-4 last:border-b-0 sm:grid-cols-[44px_minmax(0,1fr)_auto] sm:items-center sm:gap-5 sm:px-6">
+            <span className="font-mono-custom text-[10px] text-[#afb1a8]">{String(wordIndex + 1).padStart(2, '0')}</span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-display text-[25px] leading-none tracking-[-.02em] text-[#202a40]">{word.word}</h2>
+                <span className="rounded-full bg-[#e9e3d7] px-2 py-1 font-mono-custom text-[9px] uppercase text-[#666d65]">{word.type}</span>
+              </div>
+              <p className="font-arabic mt-2 text-sm text-[#24635f]" dir="rtl">{word.translation}</p>
+            </div>
+            <div className="flex items-center gap-3 sm:justify-end">
+              <span className={`rounded-full px-2.5 py-1 font-mono-custom text-[10px] ${word.level === 'A1' ? 'bg-[#d9eee9] text-[#24635f]' : word.level === 'A2' ? 'bg-[#e5e9d2] text-[#5d6732]' : word.level === 'B1' ? 'bg-[#f8e7ba] text-[#7d5b19]' : 'bg-[#f7d8cd] text-[#a04b39]'}`}>{word.level}</span>
+              {reviewed.has(word.id) && <span className="inline-flex items-center gap-1 font-mono-custom text-[9px] uppercase tracking-[.1em] text-[#24635f]"><Check size={12} /> Reviewed</span>}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AllDaysView({ days, reviewed, selectedDayIndex, onSelectDay, onBack }: { days: EditableWord[][]; reviewed: Set<number>; selectedDayIndex: number | null; onSelectDay: (dayIndex: number) => void; onBack: () => void }) {
+  const selectedDay = selectedDayIndex === null ? undefined : days[selectedDayIndex];
+  if (selectedDay && selectedDayIndex !== null) {
+    return <AllDaysDetail dayNumber={selectedDayIndex + 1} words={selectedDay} reviewed={reviewed} onBack={onBack} />;
+  }
+  return <AllDaysOverview days={days} reviewed={reviewed} onSelectDay={onSelectDay} />;
+}
+
 function Home() {
-  const [view, setView] = useState<'study' | 'browse'>('study');
+  const [view, setView] = useState<AppView>('study');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [level, setLevel] = useState('All levels');
   const [part, setPart] = useState('All parts');
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
   const [reviewed, setReviewed] = useState<Set<number>>(readReviewedIds);
   const [reviewDates, setReviewDates] = useState<Record<string, string>>(readReviewDates);
   const [wordOverrides, setWordOverrides] = useState<Record<string, WordOverrides>>(readWordOverrides);
@@ -432,6 +544,7 @@ function Home() {
   const reviewedToday = Object.values(reviewDates).filter((date) => date === today).length;
   const currentStreak = getCurrentStreak(reviewDates);
   const editableWords = useMemo(() => sourceWords.map((word) => ({ ...word, ...(wordOverrides[word.id] ?? {}) })), [wordOverrides]);
+  const days = useMemo(() => splitIntoDays(editableWords), [editableWords]);
   const filteredWords = useMemo(() => {
     const normalized = search.trim().toLocaleLowerCase();
     return editableWords.filter((word) => {
@@ -456,6 +569,8 @@ function Home() {
     });
   };
   const selectWord = (word: EditableWord) => { const index = filteredWords.findIndex((item) => item.id === word.id); setCurrentIndex(Math.max(index, 0)); setView('study'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const navigate = (nextView: AppView) => { setView(nextView); if (nextView === 'all-days') setSelectedDayIndex(null); };
+  const selectDay = (dayIndex: number) => { setSelectedDayIndex(dayIndex); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const saveWord = (id: number, changes: WordOverrides) => {
     setWordOverrides((existing) => {
       const next = { ...existing, [id]: changes };
@@ -473,10 +588,14 @@ function Home() {
   const wordsToMilestone = Math.max(0, nextMilestone - reviewed.size);
   return (
     <div className="paper-grain min-h-[100dvh] bg-[#f6f2e9]">
-      <Sidebar view={view} setView={setView} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} onReset={resetSession} reviewedToday={reviewedToday} />
-      <TopBar view={view} setView={setView} openMenu={() => setMobileOpen(true)} />
+      <Sidebar view={view} setView={navigate} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} onReset={resetSession} reviewedToday={reviewedToday} />
+      <TopBar view={view} setView={navigate} openMenu={() => setMobileOpen(true)} />
       <main className="ml-0 px-5 pb-16 pt-9 md:ml-[264px] md:px-10 md:pt-12">
         <div className="mx-auto max-w-[1250px]">
+          {view === 'all-days' ? (
+            <AllDaysView days={days} reviewed={reviewed} selectedDayIndex={selectedDayIndex} onSelectDay={selectDay} onBack={() => setSelectedDayIndex(null)} />
+          ) : (
+            <>
           <div className="animate-rise mb-9 flex flex-col justify-between gap-5 md:flex-row md:items-end">
             <div><div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.21em] text-[#24635f]"><span className="h-2 w-2 rounded-full bg-[#ef7657]" /> Your learning desk</div><h1 className="mt-3 max-w-[620px] font-display text-[clamp(2.6rem,5.3vw,4.7rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-page">{view === 'study' ? <>Make room for <em className="text-[#24635f]">better English.</em></> : <>Every word has a <em className="text-[#24635f]">place.</em></>}</h1><p className="mt-4 max-w-[470px] text-[14px] leading-relaxed text-[#71776f]">{view === 'study' ? 'A calm, focused practice for Arabic speakers. Meet a word, meet it again, then make it yours.' : 'Search the Oxford 3000 by meaning, level, or part of speech. Your next useful word is nearby.'}</p></div>
             <div className="flex items-center gap-2 text-right"><div><div className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">Current streak</div><div className="mt-1 text-sm font-semibold text-[#202a40]">{currentStreak} {currentStreak === 1 ? 'day' : 'days'} <span className="ml-1 text-[#ef7657]">/</span> {currentStreak ? 'keep going' : 'start today'}</div></div><div className="ml-2 flex h-11 w-11 items-center justify-center rounded-full border border-[#e6c94d] bg-[#f3d24f] font-display text-xl text-[#202a40]">{currentStreak}</div></div>
@@ -484,6 +603,8 @@ function Home() {
             <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-4"><StatCard label="Words met" value={String(reviewed.size)} detail="of 3,000 in your goal" accent="bg-[#24635f]" /><StatCard label="In this view" value={String(filteredWords.length)} detail="matching your filters" accent="bg-[#ef7657]" /><StatCard label="Daily rhythm" value={`${Math.min(reviewedToday, dailyGoal)} / ${dailyGoal}`} detail="words in today's session" accent="bg-[#f3d24f]" /><StatCard label="Next milestone" value={reviewed.size >= oxford3000.length ? 'Complete' : String(nextMilestone)} detail={reviewed.size >= oxford3000.length ? 'Oxford 3000 finished' : `${wordsToMilestone} words to go`} accent="bg-[#779c7b]" /></div>
           <Filters search={search} setSearch={setSearch} level={level} setLevel={setLevel} part={part} setPart={setPart} resultCount={filteredWords.length} />
            <div className="mt-8" id="library">{view === 'study' ? <StudyHome words={filteredWords} currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} reviewed={reviewed} markReviewed={markReviewed} onSaveWord={saveWord} /> : <BrowseList words={filteredWords} onSelect={selectWord} />}</div>
+            </>
+          )}
         </div>
       </main>
     </div>
