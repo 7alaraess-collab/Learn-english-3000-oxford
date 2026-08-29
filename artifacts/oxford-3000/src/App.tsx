@@ -181,6 +181,47 @@ function StatCard({ label, value, detail, accent }: { label: string; value: stri
   );
 }
 
+function PronunciationButtons({ text, label, testIdPrefix }: { text: string; label: string; testIdPrefix: string }) {
+  const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
+  const speak = (locale: 'en-US' | 'en-GB') => {
+    if (!canSpeak) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = locale;
+    utterance.rate = 0.95;
+    const localePrefix = locale.toLowerCase();
+    const voices = window.speechSynthesis.getVoices();
+    const matchingVoice = voices.find((voice) => voice.lang.toLowerCase() === localePrefix)
+      ?? voices.find((voice) => voice.lang.toLowerCase().startsWith(localePrefix.slice(0, 2)));
+    if (matchingVoice) utterance.voice = matchingVoice;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  return (
+    <div className="flex shrink-0 items-center gap-1 rounded-full border border-[#d6d1c6] bg-[#f6f2e9] p-1" aria-label={`${label} pronunciation`}>
+      <span className="px-1.5 font-mono-custom text-[9px] uppercase tracking-[0.12em] text-[#858982]">Audio</span>
+      {[
+        { locale: 'en-US' as const, shortLabel: 'US' },
+        { locale: 'en-GB' as const, shortLabel: 'UK' },
+      ].map(({ locale, shortLabel }) => (
+        <button
+          key={locale}
+          type="button"
+          data-testid={`${testIdPrefix}-${shortLabel.toLowerCase()}`}
+          onClick={() => speak(locale)}
+          disabled={!canSpeak}
+          title={canSpeak ? `Play ${shortLabel} pronunciation` : 'Speech playback is unavailable in this browser'}
+          aria-label={`Play ${label} in ${shortLabel} English`}
+          className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[10px] font-semibold text-[#5f675f] transition-colors hover:bg-[#f3d24f] hover:text-[#202a40] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Volume2 size={12} />
+          {shortLabel}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, current, total, isReviewed, onMarkReviewed, onSaveWord }: { word: EditableWord; revealed: boolean; onReveal: () => void; onNext: () => void; onPrevious: () => void; onShuffle: () => void; current: number; total: number; isReviewed: boolean; onMarkReviewed: () => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<WordOverrides>({});
@@ -243,14 +284,17 @@ function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, cu
           </div>
           <div className="mt-7 flex flex-wrap items-end gap-x-4 gap-y-2">
             <h3 className="font-display text-[clamp(3.5rem,8vw,6.2rem)] leading-[.9] tracking-[-0.065em] text-[#202a40]" data-testid="text-current-word">{word.word}</h3>
-            <button type="button" data-testid="button-pronounce" onClick={() => window.speechSynthesis?.speak(new SpeechSynthesisUtterance(word.word))} className="mb-1 flex h-9 w-9 items-center justify-center rounded-full bg-[#e9e3d7] text-[#5f675f] transition-colors hover:bg-[#f3d24f] hover:text-[#202a40]" aria-label={`Pronounce ${word.word}`}><Volume2 size={16} /></button>
+             <PronunciationButtons text={word.word} label={`the word ${word.word}`} testIdPrefix="button-pronounce-word" />
           </div>
           {revealed ? (
             <div className="animate-fade mt-8 border-t border-[#e4ded2] pt-6" data-testid="panel-answer">
               <div className="font-arabic text-[26px] font-semibold leading-tight text-[#24635f]" dir="rtl" data-testid="text-translation">{word.translation}</div>
-              <div className="mt-5 grid gap-2 border-l-2 border-[#f3d24f] pl-4">
-                <p className="text-[15px] leading-relaxed text-[#3d4651]" data-testid="text-example">“{word.example}”</p>
-                <p className="font-arabic text-[13px] leading-relaxed text-[#858982]" dir="rtl" data-testid="text-example-translation">{word.exampleTranslation}</p>
+               <div className="mt-5 grid gap-3 border-l-2 border-[#f3d24f] pl-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                 <div className="grid gap-2">
+                   <p className="text-[15px] leading-relaxed text-[#3d4651]" data-testid="text-example">“{word.example}”</p>
+                   <p className="font-arabic text-[13px] leading-relaxed text-[#858982]" dir="rtl" data-testid="text-example-translation">{word.exampleTranslation}</p>
+                 </div>
+                 <PronunciationButtons text={word.example} label="the example sentence" testIdPrefix="button-pronounce-example" />
               </div>
             </div>
           ) : (
