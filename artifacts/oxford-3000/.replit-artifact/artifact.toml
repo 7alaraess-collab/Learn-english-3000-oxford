@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Oxford 3000 Vocabulary"
+description = "An English vocabulary practice app that stores the complete Oxford 3000 word list in the app source and renders searchable, filterable flashcards with Arabic translations and examples."
+version = "1.0.0"
+id = "artifacts/oxford-3000"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24070
+
+[services.development]
+run = "pnpm --filter @workspace/oxford-3000 run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/oxford-3000", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/oxford-3000/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24070"
+BASE_PATH = "/"
