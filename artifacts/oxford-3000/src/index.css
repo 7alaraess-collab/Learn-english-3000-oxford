@@ -25,6 +25,9 @@
 }
 
 :root {
+  --app-page: #f6f2e9; --app-surface: #fbf8f1; --app-input: #f1ede4; --app-subtle: #e9e3d7;
+  --app-border: #ded8ca; --app-border-soft: #e8e2d7; --app-ink: #202a40; --app-muted: #71776f; --app-faint: #858982;
+  --app-teal: #24635f; --app-yellow: #f3d24f; --app-coral: #ef7657;
   --background: 42 35% 94%; --foreground: 223 31% 18%; --border: 36 20% 82%; --input: 36 20% 82%; --ring: 184 67% 35%;
   --card: 42 42% 97%; --card-foreground: 223 31% 18%; --card-border: 36 24% 86%;
   --popover: 42 42% 97%; --popover-foreground: 223 31% 18%; --popover-border: 36 24% 86%;
@@ -40,6 +43,9 @@
   --elevate-1: hsl(223 31% 18% / .04); --elevate-2: hsl(223 31% 18% / .08);
 }
 .dark {
+  --app-page: #101827; --app-surface: #1a2333; --app-input: #151f2f; --app-subtle: #273346;
+  --app-border: #354153; --app-border-soft: #2d394b; --app-ink: #f5f0e5; --app-muted: #aab5ab; --app-faint: #89958c;
+  --app-teal: #72c9b7; --app-yellow: #f4d45b; --app-coral: #f28b6b;
   --background: 223 31% 13%; --foreground: 42 42% 97%; --border: 223 25% 27%; --input: 223 25% 27%;
   --card: 223 27% 17%; --card-foreground: 42 42% 97%; --card-border: 223 25% 27%; --popover: 223 27% 17%; --popover-foreground: 42 42% 97%; --popover-border: 223 25% 27%;
   --primary: 47 93% 62%; --primary-foreground: 223 31% 18%; --secondary: 223 26% 25%; --secondary-foreground: 42 42% 97%;
@@ -48,7 +54,7 @@
 }
 @layer base {
   * { @apply border-border; }
-  html { scroll-behavior: smooth; }
+  html { scroll-behavior: smooth; background: var(--app-page); transition: background-color .25s ease, color .25s ease; }
   body { @apply font-sans antialiased bg-background text-foreground; }
   button, input, select { font: inherit; }
   html[dir='rtl'] body { direction: rtl; }
@@ -62,6 +68,10 @@
   .animate-rise { animation: rise .55s cubic-bezier(.2,.8,.2,1) both; }
   .animate-fade { animation: fade .35s ease both; }
   .card-flip { animation: cardFlip .38s cubic-bezier(.2,.8,.2,1) both; }
+  .animate-celebrate { animation: celebrate .7s cubic-bezier(.2,.8,.2,1) both; }
+  .celebration-orbit { position: absolute; border: 1px solid rgba(36,99,95,.15); border-radius: 999px; pointer-events: none; }
+  .celebration-orbit-one { width: 320px; height: 320px; top: -150px; left: -130px; animation: orbit 7s ease-in-out infinite; }
+  .celebration-orbit-two { width: 260px; height: 260px; right: -100px; bottom: -130px; animation: orbit 9s ease-in-out infinite reverse; }
   [dir='rtl'] .app-sidebar { left: auto; right: 0; }
   [dir='rtl'] .app-topbar { margin-left: 0; margin-right: 264px; }
   [dir='rtl'] .app-main { margin-left: 0; margin-right: 264px; }
@@ -74,4 +84,55 @@
   @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
   @keyframes cardFlip { from { opacity: .2; transform: rotateX(-7deg) scale(.985); } to { opacity: 1; transform: rotateX(0) scale(1); } }
-}
+  @keyframes celebrate { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @keyframes orbit { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(10px, 8px) rotate(7deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-rise, .animate-fade, .card-flip, .animate-celebrate, .celebration-orbit { animation: none !important; }
+  }
+ }
+
+/* The product uses a warm editorial palette in light mode. These targeted
+   overrides let the existing utility classes share the same dark tokens. */
+.dark body { background: var(--app-page); }
+.dark .app-shell { background-color: var(--app-page) !important; color: var(--app-ink); }
+.dark .app-topbar { background-color: color-mix(in srgb, var(--app-page) 92%, transparent) !important; border-color: var(--app-border) !important; }
+.dark .app-main { color: var(--app-ink); }
+.dark .app-sidebar { background-color: #0b1220 !important; }
+
+.dark [class~="bg-[#fbf8f1]"] { background-color: var(--app-surface) !important; }
+.dark [class~="bg-[#f6f2e9]"] { background-color: var(--app-input) !important; }
+.dark [class~="bg-[#e9e3d7]"] { background-color: var(--app-subtle) !important; }
+.dark [class~="bg-[#f5edda]"] { background-color: #302f27 !important; }
+.dark [class~="bg-[#d9eee9]"] { background-color: #23473f !important; }
+.dark [class~="bg-[#e5e9d2]"] { background-color: #36402d !important; }
+.dark [class~="bg-[#f8e7ba]"] { background-color: #4a3c20 !important; }
+.dark [class~="bg-[#f7d8cd]"] { background-color: #542e2a !important; }
+.dark [class~="bg-[#fff4ef]"] { background-color: #3b2623 !important; }
+.dark [class~="bg-[#eee8dc]"] { background-color: #2a3546 !important; }
+.dark [class~="bg-[#202a40]"] { background-color: #0d1524 !important; }
+.dark [class~="bg-[#24635f]"] { background-color: #2b8175 !important; }
+.dark [class~="bg-[#f3d24f]"] { background-color: var(--app-yellow) !important; }
+
+.dark [class~="text-[#202a40]"] { color: var(--app-ink) !important; }
+.dark [class~="text-[#5f675f]"] { color: #bac2b9 !important; }
+.dark [class~="text-[#71776f]"] { color: var(--app-muted) !important; }
+.dark [class~="text-[#858982]"] { color: var(--app-faint) !important; }
+.dark [class~="text-[#737970]"] { color: #aab5ab !important; }
+.dark [class~="text-[#24635f]"] { color: var(--app-teal) !important; }
+.dark [class~="text-[#a04b39]"] { color: #f0a087 !important; }
+.dark [class~="text-[#49534d]"] { color: #c0c9c0 !important; }
+.dark [class~="text-[#666d65]"] { color: #adb7ae !important; }
+.dark [class~="text-[#3d4651]"] { color: #c6d0c7 !important; }
+
+.dark [class~="border-[#ded8ca]"],
+.dark [class~="border-[#d6d1c6]"],
+.dark [class~="border-[#d8d2c6]"],
+.dark [class~="border-[#d4cec0]"],
+.dark [class~="border-[#e8e2d7]"],
+.dark [class~="border-[#e4ded2]"] { border-color: var(--app-border) !important; }
+.dark [class~="border-[#c9e2dc]"] { border-color: #35675c !important; }
+.dark [class~="border-[#e6c94d]"] { border-color: #c9a92e !important; }
+.dark [class~="placeholder:text-[#9b9e96]"]::placeholder { color: #7f8b82 !important; }
+.dark [class~="shadow-[0_2px_5px_rgba(31,41,55,.03)]"],
+.dark [class~="shadow-[0_14px_34px_rgba(31,41,55,.08)]"] { box-shadow: 0 14px 34px rgb(0 0 0 / .2) !important; }
+.dark .theme-toggle { border-color: var(--app-border) !important; background-color: var(--app-surface) !important; color: var(--app-muted) !important; }

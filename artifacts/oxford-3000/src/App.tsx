@@ -5,7 +5,7 @@ import { arSA } from '@clerk/localizations';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { getGetProgressQueryKey, useGetProgress, useSaveProgress, type ProgressInput } from '@workspace/api-client-react';
-import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Check, ChevronDown, Command, Layers3, ListFilter, Menu, Pencil, RotateCcw, Save, Search, Shuffle, Sparkles, Volume2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, Command, Gamepad2, Layers3, Link2, ListFilter, Menu, Moon, Pencil, RotateCcw, Save, Search, Shuffle, Sparkles, SpellCheck, Sun, Volume2, X } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -90,11 +90,16 @@ type EditableWord = {
 type WordOverrides = Partial<Omit<EditableWord, 'id'>>;
 type AppView = 'study' | 'browse' | 'all-days';
 type Language = 'en' | 'ar';
+type Theme = 'light' | 'dark';
+type QuizMode = 'word-building' | 'multiple-choice' | 'matching';
 
 const translations = {
   en: {
     languageButton: 'العربية',
     languageButtonLabel: 'Switch to Arabic',
+    themeToggleLabel: 'Toggle color theme',
+    lightMode: 'Light mode',
+    darkMode: 'Dark mode',
     closeMenu: 'Close menu',
     mainNavigation: 'Main navigation',
     yourDesk: 'Your desk',
@@ -156,6 +161,36 @@ const translations = {
      reviewRound: (round: number) => `Review round ${round}`,
      wordsToReview: (count: number) => `${count} ${count === 1 ? 'word' : 'words'} to review again`,
     nextWord: 'Next word',
+    quizTitle: 'Choose your practice',
+    quizDescription: 'Pick one or more games for six focused words from today’s set.',
+    quizModes: 'Quiz modes',
+    selectAtLeastOneQuiz: 'Choose at least one game to continue.',
+    startQuiz: 'Start selected games',
+    wordBuilding: 'Word building',
+    wordBuildingDescription: 'Spell the English word from its Arabic meaning.',
+    multipleChoice: 'Multiple choice',
+    multipleChoiceDescription: 'Choose the Arabic meaning that fits.',
+    matching: 'Matching',
+    matchingDescription: 'Pair each English word with its meaning.',
+    continueToQuiz: 'Continue to quiz',
+    quizWordsReady: (count: number) => `${count} words selected`,
+    quizProgress: (current: number, total: number) => `Word ${current} of ${total}`,
+    spellTheWord: 'Spell the word',
+    tapLetters: 'Tap the letters in order',
+    clearAnswer: 'Clear answer',
+    checkAnswer: 'Check answer',
+    correct: 'Correct',
+    notQuite: 'Not quite',
+    tryAgain: 'Try again',
+    nextQuizWord: 'Next word',
+    chooseMeaning: 'Choose the Arabic meaning',
+    matched: 'Matched',
+    tapToMatch: 'Tap one word and its meaning',
+    finishQuiz: 'Finish quiz',
+    quizComplete: 'Practice complete',
+    quizCompleteDescription: 'A small review today makes tomorrow easier.',
+    backToDay: 'Back to day',
+    selectedModes: (count: number) => `${count} ${count === 1 ? 'game' : 'games'} selected`,
     searchEnglishArabic: 'Search English or Arabic',
     clearSearch: 'Clear search',
     allLevels: 'All levels',
@@ -199,6 +234,9 @@ const translations = {
   ar: {
     languageButton: 'English',
     languageButtonLabel: 'التبديل إلى الإنجليزية',
+    themeToggleLabel: 'تبديل مظهر الألوان',
+    lightMode: 'الوضع الفاتح',
+    darkMode: 'الوضع الداكن',
     closeMenu: 'إغلاق القائمة',
     mainNavigation: 'التنقل الرئيسي',
     yourDesk: 'مساحتك',
@@ -260,6 +298,36 @@ const translations = {
      reviewRound: (round: number) => `جولة المراجعة ${round}`,
      wordsToReview: (count: number) => `${count} ${count === 1 ? 'كلمة' : 'كلمات'} للمراجعة مجددًا`,
     nextWord: 'الكلمة التالية',
+    quizTitle: 'اختر تدريبك',
+    quizDescription: 'اختر لعبة واحدة أو أكثر لست كلمات مركّزة من مجموعة اليوم.',
+    quizModes: 'أنماط الاختبار',
+    selectAtLeastOneQuiz: 'اختر لعبة واحدة على الأقل للمتابعة.',
+    startQuiz: 'ابدأ الألعاب المختارة',
+    wordBuilding: 'بناء الكلمة',
+    wordBuildingDescription: 'اكتب الكلمة الإنجليزية انطلاقًا من معناها العربي.',
+    multipleChoice: 'اختيار من متعدد',
+    multipleChoiceDescription: 'اختر المعنى العربي المناسب.',
+    matching: 'المطابقة',
+    matchingDescription: 'طابق كل كلمة إنجليزية مع معناها.',
+    continueToQuiz: 'المتابعة إلى الاختبار',
+    quizWordsReady: (count: number) => `${count} كلمات مختارة`,
+    quizProgress: (current: number, total: number) => `الكلمة ${current} من ${total}`,
+    spellTheWord: 'اكتب الكلمة',
+    tapLetters: 'اضغط على الحروف بالترتيب',
+    clearAnswer: 'مسح الإجابة',
+    checkAnswer: 'تحقق من الإجابة',
+    correct: 'صحيح',
+    notQuite: 'ليس تمامًا',
+    tryAgain: 'حاول مجددًا',
+    nextQuizWord: 'الكلمة التالية',
+    chooseMeaning: 'اختر المعنى العربي',
+    matched: 'تمت المطابقة',
+    tapToMatch: 'اضغط على الكلمة ومعناها',
+    finishQuiz: 'إنهاء الاختبار',
+    quizComplete: 'اكتمل التدريب',
+    quizCompleteDescription: 'مراجعة صغيرة اليوم تجعل الغد أسهل.',
+    backToDay: 'العودة إلى اليوم',
+    selectedModes: (count: number) => `${count} ${count === 1 ? 'لعبة مختارة' : 'ألعاب مختارة'}`,
     searchEnglishArabic: 'ابحث بالإنجليزية أو العربية',
     clearSearch: 'مسح البحث',
     allLevels: 'كل المستويات',
@@ -305,10 +373,18 @@ const translations = {
 type TranslationSet = (typeof translations)[Language];
 type LanguageContextValue = { language: Language; setLanguage: (language: Language) => void; t: TranslationSet };
 const LanguageContext = createContext<LanguageContextValue | null>(null);
+type ThemeContextValue = { theme: Theme; setTheme: (theme: Theme) => void };
+const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function useLanguage() {
   const context = useContext(LanguageContext);
   if (!context) throw new Error('useLanguage must be used inside LanguageContext.Provider');
+  return context;
+}
+
+function useTheme() {
+  const context = useContext(ThemeContext);
+  if (!context) throw new Error('useTheme must be used inside ThemeContext.Provider');
   return context;
 }
 
@@ -342,6 +418,205 @@ function splitIntoDays(words: EditableWord[]) {
     days.push(words.slice(start, start + wordsPerDay));
   }
   return days;
+}
+
+function shuffleItems<T>(items: T[]) {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+  return result;
+}
+
+function chooseQuizWords(words: EditableWord[], reviewLaterIds: Set<number>) {
+  const priority = words.filter((word) => reviewLaterIds.has(word.id));
+  const remaining = shuffleItems(words.filter((word) => !reviewLaterIds.has(word.id)));
+  return [...priority, ...remaining].slice(0, Math.min(6, words.length));
+}
+
+function quizModeLabel(mode: QuizMode, t: TranslationSet) {
+  if (mode === 'word-building') return t.wordBuilding;
+  if (mode === 'multiple-choice') return t.multipleChoice;
+  return t.matching;
+}
+
+function quizModeDescription(mode: QuizMode, t: TranslationSet) {
+  if (mode === 'word-building') return t.wordBuildingDescription;
+  if (mode === 'multiple-choice') return t.multipleChoiceDescription;
+  return t.matchingDescription;
+}
+
+function QuizSelection({ words, reviewLaterIds, selectedModes, onToggleMode, onStart, onBack }: { words: EditableWord[]; reviewLaterIds: Set<number>; selectedModes: Set<QuizMode>; onToggleMode: (mode: QuizMode) => void; onStart: () => void; onBack: () => void }) {
+  const { t } = useLanguage();
+  const modes: { id: QuizMode; icon: typeof SpellCheck }[] = [
+    { id: 'word-building', icon: SpellCheck },
+    { id: 'multiple-choice', icon: CheckCircle2 },
+    { id: 'matching', icon: Link2 },
+  ];
+  const quizWords = chooseQuizWords(words, reviewLaterIds);
+  return (
+    <section className="animate-rise mt-7" data-testid="panel-quiz-selection">
+      <div className="rounded-[26px] border border-[#d4cec0] bg-[#fbf8f1] p-6 shadow-[0_14px_34px_rgba(31,41,55,.06)] sm:p-10">
+        <div className="flex flex-col justify-between gap-6 border-b border-[#e4ded2] pb-7 sm:flex-row sm:items-end">
+          <div>
+            <div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.19em] text-[#24635f]"><Gamepad2 size={14} /> {t.quizModes}</div>
+            <h2 className="mt-3 font-display text-[clamp(2.1rem,4vw,3.5rem)] leading-[.95] tracking-[-.055em] text-[#202a40]">{t.quizTitle}</h2>
+            <p className="mt-3 max-w-[500px] text-sm leading-relaxed text-[#71776f]">{t.quizDescription}</p>
+          </div>
+          <div className="rounded-2xl bg-[#f5edda] px-4 py-3 text-left">
+            <div className="font-mono-custom text-[9px] uppercase tracking-[.15em] text-[#858982]">{t.quizWordsReady(quizWords.length)}</div>
+            <div className="mt-1 text-xs font-semibold text-[#24635f]">{t.selectedModes(selectedModes.size)}</div>
+          </div>
+        </div>
+        <div className="mt-7 grid gap-3 md:grid-cols-3">
+          {modes.map(({ id, icon: Icon }) => {
+            const selected = selectedModes.has(id);
+            return (
+              <button type="button" key={id} data-testid={`button-quiz-mode-${id}`} aria-pressed={selected} onClick={() => onToggleMode(id)} className={`group rounded-2xl border p-5 text-left transition-all hover:-translate-y-0.5 ${selected ? 'border-[#24635f] bg-[#edf7f3] shadow-[0_8px_22px_rgba(36,99,95,.12)]' : 'border-[#ded8ca] bg-[#f6f2e9] hover:border-[#aeb9ac]'}`}>
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${selected ? 'bg-[#24635f] text-[#f9f5e9]' : 'bg-[#e9e3d7] text-[#24635f]'}`}><Icon size={19} /></div>
+                <div className="mt-5 flex items-center justify-between gap-2">
+                  <h3 className="font-display text-[22px] tracking-[-.02em] text-[#202a40]">{quizModeLabel(id, t)}</h3>
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${selected ? 'border-[#24635f] bg-[#24635f] text-white' : 'border-[#b8b9b0]'}`}>{selected && <Check size={13} />}</span>
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-[#71776f]">{quizModeDescription(id, t)}</p>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-7 flex flex-col-reverse gap-3 border-t border-[#e4ded2] pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <button type="button" data-testid="button-quiz-back-to-celebration" onClick={onBack} className="rounded-full px-4 py-2.5 text-xs font-semibold text-[#737970] transition-colors hover:bg-[#e9e3d7] hover:text-[#202a40]">{t.returnToDayList}</button>
+          <div className="flex flex-col items-stretch gap-3 sm:items-end">
+            {selectedModes.size === 0 && <p className="text-xs text-[#a04b39]" data-testid="text-quiz-selection-error">{t.selectAtLeastOneQuiz}</p>}
+            <button type="button" data-testid="button-start-quiz" disabled={selectedModes.size === 0} onClick={onStart} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#202a40] px-5 py-3 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852] disabled:cursor-not-allowed disabled:opacity-40">{t.startQuiz} <ArrowRight size={14} /></button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WordBuildingGame({ words, onDone }: { words: EditableWord[]; onDone: () => void }) {
+  const { t } = useLanguage();
+  const [index, setIndex] = useState(0);
+  const [answer, setAnswer] = useState<number[]>([]);
+  const [checked, setChecked] = useState<boolean | null>(null);
+  const word = words[index] ?? words[0];
+  const letters = useMemo(() => shuffleItems(word.word.toLowerCase().replace(/[^a-z]/g, '').split('')), [word.word]);
+  const target = word.word.toLowerCase().replace(/[^a-z]/g, '');
+  useEffect(() => { setAnswer([]); setChecked(null); }, [word.id]);
+  const submit = () => {
+    if (answer.length !== letters.length) return;
+    const typed = answer.map((letterIndex) => letters[letterIndex]).join('');
+    setChecked(typed === target);
+  };
+  const next = () => {
+    if (index === words.length - 1) onDone();
+    else setIndex((current) => current + 1);
+  };
+  return (
+    <div data-testid="quiz-game-word-building">
+      <div className="mt-7 rounded-[26px] border border-[#d4cec0] bg-[#fbf8f1] p-6 shadow-[0_14px_34px_rgba(31,41,55,.06)] sm:p-10">
+        <div className="flex items-center justify-between gap-4"><span className="font-mono-custom text-[10px] uppercase tracking-[.16em] text-[#858982]">{t.quizProgress(index + 1, words.length)}</span><span className="rounded-full bg-[#f5edda] px-3 py-1.5 font-mono-custom text-[9px] uppercase tracking-[.1em] text-[#7d5b19]">{t.wordBuilding}</span></div>
+        <div className="mt-12 text-center">
+          <div className="font-mono-custom text-[10px] uppercase tracking-[.18em] text-[#858982]">{t.spellTheWord}</div>
+          <div className="font-arabic mt-4 text-[clamp(2rem,5vw,3.2rem)] font-semibold text-[#24635f]" dir="rtl">{word.translation}</div>
+          <p className="mt-3 text-sm text-[#858982]">{t.tapLetters}</p>
+          <div className="mt-9 flex min-h-[58px] flex-wrap items-center justify-center gap-2" aria-label={t.spellTheWord}>
+            {letters.map((_, slotIndex) => <span key={slotIndex} className={`flex h-12 min-w-10 items-center justify-center border-b-2 px-2 font-display text-3xl text-[#202a40] ${answer[slotIndex] === undefined ? 'border-[#c6bfb1]' : 'border-[#24635f]'}`}>{answer[slotIndex] !== undefined ? letters[answer[slotIndex]] : '_'}</span>)}
+          </div>
+          <div className="mx-auto mt-8 flex max-w-[520px] flex-wrap justify-center gap-2">
+            {letters.map((letter, letterIndex) => <button type="button" key={`${letter}-${letterIndex}`} data-testid={`button-letter-${letterIndex}`} disabled={answer.includes(letterIndex) || checked === true} onClick={() => setAnswer((current) => [...current, letterIndex])} className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#d6d1c6] bg-[#f6f2e9] font-display text-xl text-[#202a40] transition-all hover:-translate-y-0.5 hover:border-[#24635f] hover:bg-[#edf7f3] disabled:cursor-not-allowed disabled:opacity-35">{letter}</button>)}
+          </div>
+        </div>
+        {checked !== null && <div className={`mx-auto mt-7 flex max-w-[520px] items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold ${checked ? 'bg-[#d9eee9] text-[#24635f]' : 'bg-[#fff4ef] text-[#a04b39]'}`} data-testid="text-word-building-feedback">{checked ? <><CheckCircle2 size={16} /> {t.correct}</> : <>{t.notQuite} — {t.tryAgain}</>}</div>}
+        <div className="mt-8 flex flex-wrap justify-center gap-2">
+          <button type="button" data-testid="button-clear-word-answer" onClick={() => { setAnswer([]); setChecked(null); }} className="rounded-full border border-[#d6d1c6] px-4 py-2.5 text-xs font-semibold text-[#737970] transition-colors hover:bg-[#e9e3d7]">{t.clearAnswer}</button>
+          {checked === true ? <button type="button" data-testid="button-next-word-building" onClick={next} className="rounded-full bg-[#24635f] px-5 py-2.5 text-xs font-semibold text-[#f9f5e9]">{index === words.length - 1 ? t.finishQuiz : t.nextQuizWord} <ArrowRight size={14} className="ml-1 inline" /></button> : <button type="button" data-testid="button-check-word-answer" onClick={submit} disabled={answer.length !== letters.length} className="rounded-full bg-[#202a40] px-5 py-2.5 text-xs font-semibold text-[#f9f5e9] disabled:cursor-not-allowed disabled:opacity-40">{t.checkAnswer}</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MultipleChoiceGame({ words, allWords, onDone }: { words: EditableWord[]; allWords: EditableWord[]; onDone: () => void }) {
+  const { t } = useLanguage();
+  const [index, setIndex] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
+  const word = words[index] ?? words[0];
+  const options = useMemo(() => shuffleItems([word.translation, ...shuffleItems(allWords.filter((item) => item.id !== word.id && item.translation !== word.translation)).slice(0, 3).map((item) => item.translation)]), [word.id, allWords]);
+  useEffect(() => setSelected(null), [word.id]);
+  const next = () => { if (index === words.length - 1) onDone(); else setIndex((current) => current + 1); };
+  return (
+    <div data-testid="quiz-game-multiple-choice">
+      <div className="mt-7 rounded-[26px] border border-[#d4cec0] bg-[#fbf8f1] p-6 shadow-[0_14px_34px_rgba(31,41,55,.06)] sm:p-10">
+        <div className="flex items-center justify-between gap-4"><span className="font-mono-custom text-[10px] uppercase tracking-[.16em] text-[#858982]">{t.quizProgress(index + 1, words.length)}</span><span className="rounded-full bg-[#f5edda] px-3 py-1.5 font-mono-custom text-[9px] uppercase tracking-[.1em] text-[#7d5b19]">{t.multipleChoice}</span></div>
+        <div className="mx-auto mt-12 max-w-[620px] text-center"><div className="font-mono-custom text-[10px] uppercase tracking-[.18em] text-[#858982]">{t.chooseMeaning}</div><h3 className="mt-4 font-display text-[clamp(3rem,8vw,5.5rem)] leading-none tracking-[-.06em] text-[#202a40]">{word.word}</h3><PronunciationButtons text={word.word} label={`the word ${word.word}`} testIdPrefix="button-quiz-pronounce" /></div>
+        <div className="mx-auto mt-10 grid max-w-[700px] gap-3 sm:grid-cols-2">
+          {options.map((option, optionIndex) => {
+            const isCorrect = option === word.translation;
+            const isSelected = selected === option;
+            return <button type="button" key={`${option}-${optionIndex}`} data-testid={`button-meaning-option-${optionIndex}`} disabled={selected !== null} onClick={() => setSelected(option)} dir="rtl" className={`min-h-14 rounded-2xl border px-5 py-4 text-right font-arabic text-base transition-all ${selected === null ? 'border-[#ded8ca] bg-[#f6f2e9] hover:-translate-y-0.5 hover:border-[#24635f]' : isCorrect ? 'border-[#24635f] bg-[#d9eee9] text-[#24635f]' : isSelected ? 'border-[#a04b39] bg-[#fff4ef] text-[#a04b39]' : 'border-[#ded8ca] bg-[#f6f2e9] opacity-60'}`}>{option}{selected !== null && isCorrect && <Check size={16} className="ml-2 inline" />}</button>;
+          })}
+        </div>
+        {selected !== null && <div className={`mx-auto mt-6 max-w-[700px] text-center text-sm font-semibold ${selected === word.translation ? 'text-[#24635f]' : 'text-[#a04b39]'}`} data-testid="text-multiple-choice-feedback">{selected === word.translation ? t.correct : t.notQuite}</div>}
+        {selected !== null && <div className="mt-7 text-center"><button type="button" data-testid="button-next-multiple-choice" onClick={next} className="rounded-full bg-[#202a40] px-5 py-2.5 text-xs font-semibold text-[#f9f5e9]">{index === words.length - 1 ? t.finishQuiz : t.nextQuizWord} <ArrowRight size={14} className="ml-1 inline" /></button></div>}
+      </div>
+    </div>
+  );
+}
+
+function MatchingGame({ words, onDone }: { words: EditableWord[]; onDone: () => void }) {
+  const { t } = useLanguage();
+  const [matched, setMatched] = useState<Set<number>>(new Set());
+  const [selectedEnglish, setSelectedEnglish] = useState<number | null>(null);
+  const [selectedArabic, setSelectedArabic] = useState<number | null>(null);
+  const [wrongPair, setWrongPair] = useState<[number, number] | null>(null);
+  const meanings = useMemo(() => shuffleItems(words), [words]);
+  useEffect(() => {
+    if (selectedEnglish === null || selectedArabic === null) return;
+    let timer: number | undefined;
+    if (selectedEnglish === selectedArabic) {
+      const next = new Set(matched).add(selectedEnglish);
+      setMatched(next);
+      setSelectedEnglish(null);
+      setSelectedArabic(null);
+      if (next.size === words.length) window.setTimeout(onDone, 450);
+    } else {
+      setWrongPair([selectedEnglish, selectedArabic]);
+      timer = window.setTimeout(() => { setWrongPair(null); setSelectedEnglish(null); setSelectedArabic(null); }, 550);
+    }
+    return () => { if (timer !== undefined) window.clearTimeout(timer); };
+  }, [selectedEnglish, selectedArabic, matched, words.length, onDone]);
+  return (
+    <div data-testid="quiz-game-matching">
+      <div className="mt-7 rounded-[26px] border border-[#d4cec0] bg-[#fbf8f1] p-6 shadow-[0_14px_34px_rgba(31,41,55,.06)] sm:p-10">
+        <div className="flex items-center justify-between gap-4"><span className="font-mono-custom text-[10px] uppercase tracking-[.16em] text-[#858982]">{t.quizProgress(matched.size + 1, words.length)}</span><span className="rounded-full bg-[#f5edda] px-3 py-1.5 font-mono-custom text-[9px] uppercase tracking-[.1em] text-[#7d5b19]">{t.matching}</span></div>
+        <div className="mt-8 text-center"><p className="text-sm text-[#71776f]">{t.tapToMatch}</p></div>
+        <div className="mt-7 grid gap-3 md:grid-cols-2">
+          <div className="space-y-2">
+            {words.map((item) => <button type="button" key={item.id} disabled={matched.has(item.id)} onClick={() => setSelectedEnglish(item.id)} className={`flex min-h-14 w-full items-center justify-between rounded-2xl border px-4 py-3 text-left font-display text-xl transition-all ${matched.has(item.id) ? 'border-[#c9e2dc] bg-[#edf7f3] text-[#24635f]' : wrongPair?.[0] === item.id ? 'border-[#a04b39] bg-[#fff4ef] text-[#a04b39]' : selectedEnglish === item.id ? 'border-[#24635f] bg-[#d9eee9] text-[#24635f]' : 'border-[#ded8ca] bg-[#f6f2e9] text-[#202a40] hover:border-[#24635f]'}`}>{item.word}{matched.has(item.id) && <Check size={16} />}</button>)}
+          </div>
+          <div className="space-y-2">
+            {meanings.map((item) => <button type="button" key={item.id} disabled={matched.has(item.id)} onClick={() => setSelectedArabic(item.id)} dir="rtl" className={`flex min-h-14 w-full items-center justify-between rounded-2xl border px-4 py-3 text-right font-arabic text-base transition-all ${matched.has(item.id) ? 'border-[#c9e2dc] bg-[#edf7f3] text-[#24635f]' : wrongPair?.[1] === item.id ? 'border-[#a04b39] bg-[#fff4ef] text-[#a04b39]' : selectedArabic === item.id ? 'border-[#24635f] bg-[#d9eee9] text-[#24635f]' : 'border-[#ded8ca] bg-[#f6f2e9] text-[#202a40] hover:border-[#24635f]'}`}>{item.translation}{matched.has(item.id) && <Check size={16} />}</button>)}
+          </div>
+        </div>
+        <div className="mt-6 text-center font-mono-custom text-[10px] uppercase tracking-[.14em] text-[#858982]">{t.matched}: {matched.size}/{words.length}</div>
+      </div>
+    </div>
+  );
+}
+
+function QuizExperience({ words, allWords, modes, onBack, onFinish }: { words: EditableWord[]; allWords: EditableWord[]; modes: QuizMode[]; onBack: () => void; onFinish: () => void }) {
+  const { t } = useLanguage();
+  const [modeIndex, setModeIndex] = useState(0);
+  const [complete, setComplete] = useState(false);
+  const mode = modes[modeIndex];
+  const handleDone = () => { if (modeIndex === modes.length - 1) setComplete(true); else setModeIndex((current) => current + 1); };
+  if (complete) {
+    return <section className="animate-rise mt-7" data-testid="panel-quiz-complete"><div className="rounded-[26px] border border-[#c9e2dc] bg-[#edf7f3] px-6 py-20 text-center shadow-[0_14px_34px_rgba(31,41,55,.06)]"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#24635f] text-[#f9f5e9]"><CheckCircle2 size={30} /></div><h2 className="mt-6 font-display text-[clamp(2.3rem,5vw,4rem)] leading-none tracking-[-.055em] text-[#202a40]">{t.quizComplete}</h2><p className="mx-auto mt-4 max-w-[390px] text-sm leading-relaxed text-[#5f675f]">{t.quizCompleteDescription}</p><button type="button" data-testid="button-finish-quiz" onClick={onFinish} className="mt-8 rounded-full bg-[#202a40] px-5 py-3 text-xs font-semibold text-[#f9f5e9]">{t.backToDay}</button></div></section>;
+  }
+  return <section data-testid="panel-quiz-experience"><div className="mt-7 flex items-center justify-between gap-4"><button type="button" data-testid="button-quiz-back-to-selection" onClick={onBack} className="rounded-full border border-[#d6d1c6] bg-[#fbf8f1] px-3.5 py-2 text-xs font-semibold text-[#737970] hover:border-[#24635f] hover:text-[#24635f]"><ArrowLeft size={14} className="mr-1 inline" /> {t.quizModes}</button><span className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">{modeIndex + 1} / {modes.length}</span></div>{mode === 'word-building' && <WordBuildingGame words={words} onDone={handleDone} />}{mode === 'multiple-choice' && <MultipleChoiceGame words={words} allWords={allWords} onDone={handleDone} />}{mode === 'matching' && <MatchingGame words={words} onDone={handleDone} />}</section>;
 }
 
 function localDateKey(date = new Date()) {
@@ -515,6 +790,7 @@ function AuthControls() {
 
 function TopBar({ view, setView, openMenu }: { view: AppView; setView: (view: AppView) => void; openMenu: () => void }) {
   const { language, t, setLanguage } = useLanguage();
+  const { theme, setTheme } = useTheme();
   const formattedDate = new Intl.DateTimeFormat(language === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
   return (
     <header className="app-topbar sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-[#ded8ca] bg-[#f6f2e9]/90 px-5 backdrop-blur-md md:ml-[264px] md:px-10">
@@ -526,6 +802,13 @@ function TopBar({ view, setView, openMenu }: { view: AppView; setView: (view: Ap
         <button type="button" data-testid="button-top-study" onClick={() => setView('study')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'study' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>{t.study}</button>
         <button type="button" data-testid="button-top-browse" onClick={() => setView('browse')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'browse' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>{t.browse}</button>
         <button type="button" data-testid="button-top-all-days" onClick={() => setView('all-days')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'all-days' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>{t.allDays}</button>
+         <button type="button" role="switch" aria-checked={theme === 'dark'} aria-label={t.themeToggleLabel} data-testid="button-theme-toggle" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="theme-toggle inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] bg-[#fbf8f1] px-2.5 py-1.5 text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]">
+           {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+           <span className="hidden text-[11px] font-semibold md:inline">{theme === 'dark' ? t.lightMode : t.darkMode}</span>
+           <span className={`relative h-4 w-7 rounded-full transition-colors ${theme === 'dark' ? 'bg-[#24635f]' : 'bg-[#d6d1c6]'}`} aria-hidden="true">
+             <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-[#fbf8f1] shadow-sm transition-transform ${theme === 'dark' ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+           </span>
+         </button>
         <button type="button" data-testid="button-language-toggle" onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')} aria-label={t.languageButtonLabel} className="rounded-full border border-[#d6d1c6] bg-[#fbf8f1] px-3 py-1.5 text-xs font-semibold text-[#24635f] transition-colors hover:border-[#24635f] hover:bg-[#e9e3d7]">{t.languageButton}</button>
         <AuthControls />
       </div>
@@ -857,8 +1140,14 @@ function AllDaysDetail({ dayNumber, words, reviewed, onBack, onMarkReviewed, onS
   const [flashcardIndex, setFlashcardIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [reviewLaterIds, setReviewLaterIds] = useState<Set<number>>(new Set());
+  const [pendingReviewIds, setPendingReviewIds] = useState<Set<number>>(new Set());
   const [sessionRound, setSessionRound] = useState(1);
   const [sessionComplete, setSessionComplete] = useState(false);
+  const [celebrationVisible, setCelebrationVisible] = useState(false);
+  const [quizSelectionVisible, setQuizSelectionVisible] = useState(false);
+  const [quizStarted, setQuizStarted] = useState(false);
+  const [selectedQuizModes, setSelectedQuizModes] = useState<Set<QuizMode>>(new Set());
+  const [quizWords, setQuizWords] = useState<EditableWord[]>([]);
   const reviewedCount = words.filter((word) => reviewed.has(word.id)).length;
   const sessionWords = sessionWordIds
     .map((id) => words.find((word) => word.id === id))
@@ -869,14 +1158,26 @@ function AllDaysDetail({ dayNumber, words, reviewed, onBack, onMarkReviewed, onS
     setFlashcardIndex(0);
     setRevealed(false);
     setReviewLaterIds(new Set());
+    setPendingReviewIds(new Set());
     setSessionRound(1);
     setSessionComplete(false);
+    setCelebrationVisible(false);
+    setQuizSelectionVisible(false);
+    setQuizStarted(false);
+    setSelectedQuizModes(new Set());
+    setQuizWords([]);
     setFlashcardMode(true);
   };
   const leaveFlashcardMode = () => {
     setRevealed(false);
     setReviewLaterIds(new Set());
+    setPendingReviewIds(new Set());
     setSessionComplete(false);
+    setCelebrationVisible(false);
+    setQuizSelectionVisible(false);
+    setQuizStarted(false);
+    setSelectedQuizModes(new Set());
+    setQuizWords([]);
     setFlashcardMode(false);
   };
   const nextFlashcard = () => {
@@ -895,14 +1196,17 @@ function AllDaysDetail({ dayNumber, words, reviewed, onBack, onMarkReviewed, onS
     if (!currentWord || sessionComplete) return;
 
     const nextReviewLaterIds = new Set(reviewLaterIds);
+    const nextPendingReviewIds = new Set(pendingReviewIds);
     if (result === 'got-it') {
-      nextReviewLaterIds.delete(currentWord.id);
+      nextPendingReviewIds.delete(currentWord.id);
       onMarkReviewed(currentWord.id);
     } else {
       nextReviewLaterIds.add(currentWord.id);
+      nextPendingReviewIds.add(currentWord.id);
     }
 
     setReviewLaterIds(nextReviewLaterIds);
+    setPendingReviewIds(nextPendingReviewIds);
     setRevealed(false);
 
     if (flashcardIndex < sessionWords.length - 1) {
@@ -910,14 +1214,29 @@ function AllDaysDetail({ dayNumber, words, reviewed, onBack, onMarkReviewed, onS
       return;
     }
 
-    const nextRoundIds = sessionWords.filter((word) => nextReviewLaterIds.has(word.id)).map((word) => word.id);
+    const nextRoundIds = sessionWords.filter((word) => nextPendingReviewIds.has(word.id)).map((word) => word.id);
     if (nextRoundIds.length > 0) {
       setSessionWordIds(nextRoundIds);
       setFlashcardIndex(0);
       setSessionRound((current) => current + 1);
     } else {
       setSessionComplete(true);
+      setCelebrationVisible(true);
     }
+  };
+  const toggleQuizMode = (mode: QuizMode) => {
+    setSelectedQuizModes((existing) => {
+      const next = new Set(existing);
+      if (next.has(mode)) next.delete(mode);
+      else next.add(mode);
+      return next;
+    });
+  };
+  const startQuiz = () => {
+    if (selectedQuizModes.size === 0) return;
+    setQuizWords(chooseQuizWords(words, reviewLaterIds));
+    setQuizSelectionVisible(false);
+    setQuizStarted(true);
   };
   return (
     <section className="animate-rise" data-testid="section-all-days-detail">
@@ -951,11 +1270,20 @@ function AllDaysDetail({ dayNumber, words, reviewed, onBack, onMarkReviewed, onS
                 {!sessionComplete && reviewLaterIds.size > 0 && <span className="rounded-full bg-[#f7d8cd] px-2.5 py-1 text-[#a04b39]" data-testid="text-review-later-count">{t.wordsToReview(reviewLaterIds.size)}</span>}
               </div>
            </div>
-            {sessionComplete ? (
-              <div className="rounded-[26px] border border-[#c9e2dc] bg-[#edf7f3] px-6 py-16 text-center shadow-[0_14px_34px_rgba(31,41,55,.06)]" data-testid="panel-day-flashcard-complete">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#24635f] text-[#f9f5e9]"><Check size={27} /></div>
-                <h2 className="mt-5 font-display text-3xl tracking-[-.04em] text-[#202a40]">{t.dailySessionComplete}</h2>
-                <p className="mt-2 text-sm text-[#5f675f]">{language === 'ar' ? 'أحسنت! تعلّمت كل كلمات هذا اليوم.' : 'Well done! You learned every word in this day’s set.'}</p>
+            {quizStarted ? (
+              <QuizExperience words={quizWords} allWords={words} modes={[...selectedQuizModes]} onBack={() => { setQuizStarted(false); setQuizSelectionVisible(true); }} onFinish={leaveFlashcardMode} />
+            ) : sessionComplete && quizSelectionVisible ? (
+              <QuizSelection words={words} reviewLaterIds={reviewLaterIds} selectedModes={selectedQuizModes} onToggleMode={toggleQuizMode} onStart={startQuiz} onBack={leaveFlashcardMode} />
+            ) : sessionComplete && celebrationVisible ? (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#202a40]/45 px-5 backdrop-blur-sm" data-testid="panel-session-celebration">
+                <div className="animate-celebrate relative w-full max-w-[500px] overflow-hidden rounded-[30px] border border-[#c9e2dc] bg-[#edf7f3] px-7 py-14 text-center shadow-[0_24px_70px_rgba(31,41,55,.22)] sm:px-12">
+                  <div className="celebration-orbit celebration-orbit-one" />
+                  <div className="celebration-orbit celebration-orbit-two" />
+                  <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#24635f] text-[#f9f5e9] shadow-[0_0_0_10px_rgba(36,99,95,.08)]"><Sparkles size={28} /></div>
+                  <h2 className="relative mt-6 font-display text-[clamp(2.3rem,6vw,3.5rem)] leading-none tracking-[-.055em] text-[#202a40]">{t.dailySessionComplete}</h2>
+                  <p className="relative mx-auto mt-4 max-w-[340px] text-sm leading-relaxed text-[#5f675f]">{t.dailyWordsLeft(0)}</p>
+                  <button type="button" data-testid="button-continue-to-quiz" onClick={() => { setCelebrationVisible(false); setQuizSelectionVisible(true); }} className="relative mt-8 inline-flex items-center gap-2 rounded-full bg-[#202a40] px-5 py-3 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852]">{t.continueToQuiz} <ArrowRight size={14} /></button>
+                </div>
               </div>
             ) : currentWord && (
              <>
@@ -1406,6 +1734,13 @@ function App() {
       return 'en';
     }
   });
+  const [theme, setTheme] = useState<Theme>(() => {
+    try {
+      return window.localStorage.getItem('wordroom-theme') === 'dark' ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
+  });
 
   useEffect(() => {
     const direction = language === 'ar' ? 'rtl' : 'ltr';
@@ -1419,9 +1754,19 @@ function App() {
     }
   }, [language]);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.dataset.theme = theme;
+    try {
+      window.localStorage.setItem('wordroom-theme', theme);
+    } catch {
+      // Theme preference is optional when storage is unavailable.
+    }
+  }, [theme]);
+
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t: translations[language] }}>
-      <WouterRouter base={basePath}><ClerkProviderWithRoutes /></WouterRouter>
+      <ThemeContext.Provider value={{ theme, setTheme }}><WouterRouter base={basePath}><ClerkProviderWithRoutes /></WouterRouter></ThemeContext.Provider>
     </LanguageContext.Provider>
   );
 }
