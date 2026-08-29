@@ -1,10 +1,10 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, Command, Layers3, ListFilter, Menu, RotateCcw, Search, Shuffle, Sparkles, Volume2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, Command, Layers3, ListFilter, Menu, Pencil, RotateCcw, Save, Search, Shuffle, Sparkles, Volume2, X } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { oxford3000, type OxfordWord } from './oxford3000';
+import { oxford3000 } from './oxford3000';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 
@@ -15,6 +15,21 @@ const typeOptions = ['All parts', 'Noun', 'Verb', 'Adjective', 'Adverb', 'Prepos
 const reviewedStorageKey = 'wordroom-reviewed';
 const reviewDatesStorageKey = 'wordroom-review-dates';
 const dailyGoal = 12;
+const overridesStorageKey = 'wordroom-word-overrides';
+
+type EditableWord = {
+  id: number;
+  word: string;
+  type: string;
+  level: string;
+  translation: string;
+  example: string;
+  exampleTranslation: string;
+};
+
+type WordOverrides = Partial<Omit<EditableWord, 'id'>>;
+
+const sourceWords: EditableWord[] = oxford3000.map((word) => ({ ...word }));
 
 function localDateKey(date = new Date()) {
   const year = date.getFullYear();
@@ -39,6 +54,24 @@ function readReviewDates() {
     const saved = JSON.parse(window.localStorage.getItem(reviewDatesStorageKey) ?? '{}') as unknown;
     if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {};
     return Object.fromEntries(Object.entries(saved).filter(([, date]) => typeof date === 'string')) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+function readWordOverrides() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(overridesStorageKey) ?? '{}') as unknown;
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {};
+    const fields: (keyof WordOverrides)[] = ['word', 'type', 'level', 'translation', 'example', 'exampleTranslation'];
+    const validIds = new Set(sourceWords.map((word) => word.id));
+    return Object.fromEntries(Object.entries(saved).filter(([id, value]) => {
+      if (!validIds.has(Number(id)) || !value || typeof value !== 'object' || Array.isArray(value)) return false;
+      return Object.keys(value).some((field) => fields.includes(field as keyof WordOverrides));
+    }).map(([id, value]) => {
+      const clean = Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([field, text]) => fields.includes(field as keyof WordOverrides) && typeof text === 'string')) as WordOverrides;
+      return [id, clean];
+    })) as Record<string, WordOverrides>;
   } catch {
     return {};
   }
@@ -148,7 +181,24 @@ function StatCard({ label, value, detail, accent }: { label: string; value: stri
   );
 }
 
-function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, current, total, isReviewed, onMarkReviewed }: { word: OxfordWord; revealed: boolean; onReveal: () => void; onNext: () => void; onPrevious: () => void; onShuffle: () => void; current: number; total: number; isReviewed: boolean; onMarkReviewed: () => void }) {
+function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, current, total, isReviewed, onMarkReviewed, onSaveWord }: { word: EditableWord; revealed: boolean; onReveal: () => void; onNext: () => void; onPrevious: () => void; onShuffle: () => void; current: number; total: number; isReviewed: boolean; onMarkReviewed: () => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<WordOverrides>({});
+  const startEditing = () => {
+    setDraft({ word: word.word, type: word.type, level: word.level, translation: word.translation, example: word.example, exampleTranslation: word.exampleTranslation });
+    setEditing(true);
+  };
+  const cancelEditing = () => {
+    setDraft({});
+    setEditing(false);
+  };
+  const saveEditing = () => {
+    if (Object.values(draft).some((value) => !value?.trim())) return;
+    onSaveWord(word.id, draft);
+    setEditing(false);
+  };
+  const updateDraft = (field: keyof WordOverrides, value: string) => setDraft((currentDraft) => ({ ...currentDraft, [field]: value }));
+  const inputClassName = 'mt-1 w-full rounded-lg border border-[#d8d2c6] bg-[#f6f2e9] px-3 py-2 text-sm text-[#202a40] outline-none focus:border-[#24635f] focus:ring-2 focus:ring-[#24635f]/10';
   return (
     <section className="animate-rise" data-testid="section-flashcard">
       <div className="mb-4 flex items-center justify-between">
@@ -163,9 +213,30 @@ function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, cu
       <div className="relative overflow-hidden rounded-[26px] border border-[#d4cec0] bg-[#fbf8f1] shadow-[0_14px_34px_rgba(31,41,55,.08)]">
         <div className="flex items-center justify-between border-b border-[#e4ded2] px-6 py-4 sm:px-9">
           <span className="font-mono-custom text-[10px] uppercase tracking-[0.16em] text-[#858982]">Card {String(current + 1).padStart(2, '0')} <span className="text-[#c8c1b2]">/ {String(total).padStart(2, '0')}</span></span>
-          <span className={`rounded-full px-2.5 py-1 font-mono-custom text-[10px] font-medium ${word.level === 'A1' ? 'bg-[#d9eee9] text-[#24635f]' : word.level === 'A2' ? 'bg-[#e5e9d2] text-[#5d6732]' : word.level === 'B1' ? 'bg-[#f8e7ba] text-[#7d5b19]' : 'bg-[#f7d8cd] text-[#a04b39]'}`}>{word.level}</span>
+           <div className="flex items-center gap-2">
+             <span className={`rounded-full px-2.5 py-1 font-mono-custom text-[10px] font-medium ${word.level === 'A1' ? 'bg-[#d9eee9] text-[#24635f]' : word.level === 'A2' ? 'bg-[#e5e9d2] text-[#5d6732]' : word.level === 'B1' ? 'bg-[#f8e7ba] text-[#7d5b19]' : 'bg-[#f7d8cd] text-[#a04b39]'}`}>{word.level}</span>
+             <button type="button" data-testid="button-edit-word" onClick={startEditing} className="inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] bg-[#f6f2e9] px-2.5 py-1.5 text-[11px] font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]"><Pencil size={12} /> Edit</button>
+           </div>
         </div>
-        <div key={`${word.id}-${revealed}`} className="card-flip min-h-[340px] px-6 py-10 sm:min-h-[360px] sm:px-12 sm:py-12">
+         <div key={`${word.id}-${revealed}-${editing}`} className="card-flip min-h-[340px] px-6 py-10 sm:min-h-[360px] sm:px-12 sm:py-12">
+           {editing ? (
+             <div className="animate-fade" data-testid="panel-edit-word">
+               <div className="flex items-center gap-2 text-[#24635f]"><Pencil size={15} /><span className="font-mono-custom text-[10px] uppercase tracking-[0.17em]">Edit this card</span></div>
+               <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                 <label className="text-xs font-semibold text-[#5f675f]">English word<input value={draft.word ?? ''} onChange={(event) => updateDraft('word', event.target.value)} className={inputClassName} required /></label>
+                 <label className="text-xs font-semibold text-[#5f675f]">Part of speech<input value={draft.type ?? ''} onChange={(event) => updateDraft('type', event.target.value)} className={inputClassName} required /></label>
+                 <label className="text-xs font-semibold text-[#5f675f]">CEFR level<input value={draft.level ?? ''} onChange={(event) => updateDraft('level', event.target.value)} className={inputClassName} required /></label>
+                 <label className="text-xs font-semibold text-[#5f675f]">Arabic translation<input dir="rtl" value={draft.translation ?? ''} onChange={(event) => updateDraft('translation', event.target.value)} className={`${inputClassName} font-arabic`} required /></label>
+                 <label className="text-xs font-semibold text-[#5f675f] sm:col-span-2">English example<textarea value={draft.example ?? ''} onChange={(event) => updateDraft('example', event.target.value)} className={`${inputClassName} min-h-20 resize-y`} required /></label>
+                 <label className="text-xs font-semibold text-[#5f675f] sm:col-span-2">Arabic example translation<textarea dir="rtl" value={draft.exampleTranslation ?? ''} onChange={(event) => updateDraft('exampleTranslation', event.target.value)} className={`${inputClassName} min-h-20 resize-y font-arabic`} required /></label>
+               </div>
+               <div className="mt-6 flex justify-end gap-2">
+                 <button type="button" onClick={cancelEditing} className="inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] px-3 py-2 text-xs font-semibold text-[#737970] hover:bg-[#eee8dc]"><X size={14} /> Cancel</button>
+                 <button type="button" data-testid="button-save-word" onClick={saveEditing} className="inline-flex items-center gap-1.5 rounded-full bg-[#24635f] px-3.5 py-2 text-xs font-semibold text-[#f9f5e9] hover:bg-[#1c514e]"><Save size={14} /> Save changes</button>
+               </div>
+             </div>
+           ) : (
+             <>
           <div className="flex items-center gap-2 text-[#ef7657]">
             <span className="h-2 w-2 rounded-full bg-[#ef7657]" />
             <span className="font-mono-custom text-[10px] uppercase tracking-[0.17em]">{word.type}</span>
@@ -185,6 +256,8 @@ function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, cu
           ) : (
             <button type="button" data-testid="button-reveal" onClick={onReveal} className="mt-9 flex items-center gap-2 border-b border-dashed border-[#9da398] pb-1 text-sm font-semibold text-[#5f675f] transition-colors hover:border-[#ef7657] hover:text-[#c14f39]">Tap to reveal <ArrowRight size={15} /></button>
           )}
+             </>
+           )}
         </div>
         <div className="flex items-center justify-between border-t border-[#e4ded2] px-5 py-4 sm:px-9">
           <button type="button" data-testid="button-previous" onClick={onPrevious} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-[#737970] transition-colors hover:bg-[#eee8dc] hover:text-[#202a40]"><ArrowLeft size={15} /> Previous</button>
@@ -227,7 +300,7 @@ function Filters({ search, setSearch, level, setLevel, part, setPart, resultCoun
   );
 }
 
-function BrowseList({ words, onSelect }: { words: OxfordWord[]; onSelect: (word: OxfordWord) => void }) {
+function BrowseList({ words, onSelect }: { words: EditableWord[]; onSelect: (word: EditableWord) => void }) {
   return (
     <section className="animate-rise mt-6" data-testid="section-word-library">
       <div className="mb-4 flex items-end justify-between">
@@ -253,7 +326,7 @@ function BrowseList({ words, onSelect }: { words: OxfordWord[]; onSelect: (word:
   );
 }
 
-function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, markReviewed }: { words: OxfordWord[]; currentIndex: number; setCurrentIndex: (index: number) => void; reviewed: Set<number>; markReviewed: (id: number) => void }) {
+function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, markReviewed, onSaveWord }: { words: EditableWord[]; currentIndex: number; setCurrentIndex: (index: number) => void; reviewed: Set<number>; markReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
   const [revealed, setRevealed] = useState(false);
   const current = words[currentIndex] ?? words[0];
   const goalPercent = Math.min(100, (reviewed.size / oxford3000.length) * 100);
@@ -274,7 +347,7 @@ function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, markReviewe
   return (
     <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_280px]">
       <div>
-        <Flashcard word={current} revealed={revealed} onReveal={() => setRevealed(true)} onNext={next} onPrevious={previous} onShuffle={shuffle} current={currentIndex} total={words.length} isReviewed={reviewed.has(current.id)} onMarkReviewed={() => markReviewed(current.id)} />
+         <Flashcard word={current} revealed={revealed} onReveal={() => setRevealed(true)} onNext={next} onPrevious={previous} onShuffle={shuffle} current={currentIndex} total={words.length} isReviewed={reviewed.has(current.id)} onMarkReviewed={() => markReviewed(current.id)} onSaveWord={onSaveWord} />
         <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-[#9a9e94]" data-testid="text-keyboard-hint"><span className="rounded border border-[#d8d2c6] bg-[#fbf8f1] px-1.5 py-0.5 font-mono-custom text-[10px]">space</span> to reveal <span className="mx-1 text-[#c5c0b5]">·</span> <span className="rounded border border-[#d8d2c6] bg-[#fbf8f1] px-1.5 py-0.5 font-mono-custom text-[10px]">← →</span> to move</div>
       </div>
       <aside className="space-y-4">
@@ -310,18 +383,20 @@ function Home() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [reviewed, setReviewed] = useState<Set<number>>(readReviewedIds);
   const [reviewDates, setReviewDates] = useState<Record<string, string>>(readReviewDates);
+  const [wordOverrides, setWordOverrides] = useState<Record<string, WordOverrides>>(readWordOverrides);
   const today = localDateKey();
   const reviewedToday = Object.values(reviewDates).filter((date) => date === today).length;
   const currentStreak = getCurrentStreak(reviewDates);
+  const editableWords = useMemo(() => sourceWords.map((word) => ({ ...word, ...(wordOverrides[word.id] ?? {}) })), [wordOverrides]);
   const filteredWords = useMemo(() => {
     const normalized = search.trim().toLocaleLowerCase();
-    return oxford3000.filter((word) => {
+    return editableWords.filter((word) => {
       const matchesSearch = !normalized || word.word.toLocaleLowerCase().includes(normalized) || word.translation.includes(search.trim());
       const matchesLevel = level === 'All levels' || word.level === level;
       const matchesPart = part === 'All parts' || word.type.toLowerCase().includes(part.toLowerCase());
       return matchesSearch && matchesLevel && matchesPart;
     });
-  }, [search, level, part]);
+  }, [editableWords, search, level, part]);
   useEffect(() => { if (currentIndex >= filteredWords.length) setCurrentIndex(0); }, [currentIndex, filteredWords.length]);
   const markReviewed = (id: number) => {
     setReviewed((existing) => {
@@ -336,7 +411,14 @@ function Home() {
       return next;
     });
   };
-  const selectWord = (word: OxfordWord) => { const index = filteredWords.findIndex((item) => item.id === word.id); setCurrentIndex(Math.max(index, 0)); setView('study'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const selectWord = (word: EditableWord) => { const index = filteredWords.findIndex((item) => item.id === word.id); setCurrentIndex(Math.max(index, 0)); setView('study'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const saveWord = (id: number, changes: WordOverrides) => {
+    setWordOverrides((existing) => {
+      const next = { ...existing, [id]: changes };
+      window.localStorage.setItem(overridesStorageKey, JSON.stringify(next));
+      return next;
+    });
+  };
   const resetSession = () => {
     setReviewed(new Set());
     setReviewDates({});
@@ -357,7 +439,7 @@ function Home() {
           </div>
             <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-4"><StatCard label="Words met" value={String(reviewed.size)} detail="of 3,000 in your goal" accent="bg-[#24635f]" /><StatCard label="In this view" value={String(filteredWords.length)} detail="matching your filters" accent="bg-[#ef7657]" /><StatCard label="Daily rhythm" value={`${Math.min(reviewedToday, dailyGoal)} / ${dailyGoal}`} detail="words in today's session" accent="bg-[#f3d24f]" /><StatCard label="Next milestone" value={reviewed.size >= oxford3000.length ? 'Complete' : String(nextMilestone)} detail={reviewed.size >= oxford3000.length ? 'Oxford 3000 finished' : `${wordsToMilestone} words to go`} accent="bg-[#779c7b]" /></div>
           <Filters search={search} setSearch={setSearch} level={level} setLevel={setLevel} part={part} setPart={setPart} resultCount={filteredWords.length} />
-           <div className="mt-8" id="library">{view === 'study' ? <StudyHome words={filteredWords} currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} reviewed={reviewed} markReviewed={markReviewed} /> : <BrowseList words={filteredWords} onSelect={selectWord} />}</div>
+           <div className="mt-8" id="library">{view === 'study' ? <StudyHome words={filteredWords} currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} reviewed={reviewed} markReviewed={markReviewed} onSaveWord={saveWord} /> : <BrowseList words={filteredWords} onSelect={selectWord} />}</div>
         </div>
       </main>
     </div>
