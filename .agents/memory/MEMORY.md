@@ -1,1 +1,2 @@
 - [Artifact build environment](build-environment.md) — manual Vite builds for path-routed artifacts need the same PORT and BASE_PATH values declared by artifact configuration.
+- [Clerk Arabic localization](clerk-localization.md) — bundled arSA is partial; explicitly cover auth gaps and the development badge while preserving app language state.
