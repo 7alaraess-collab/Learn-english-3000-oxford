@@ -185,6 +185,8 @@ const translations = {
     reviewed: 'reviewed',
     progress: 'Progress',
     allDaysBack: 'All Days',
+    flashcardMode: 'Flashcard Mode',
+    returnToDayList: 'Back to day list',
     audio: 'Audio',
     playPronunciation: (label: string, shortLabel: string) => `Play ${label} in ${shortLabel} English`,
     pronunciationUnavailable: 'Speech playback is unavailable in this browser',
@@ -282,6 +284,8 @@ const translations = {
     reviewed: 'تمت مراجعتها',
     progress: 'التقدم',
     allDaysBack: 'كل الأيام',
+    flashcardMode: 'وضع البطاقات',
+    returnToDayList: 'العودة إلى قائمة اليوم',
     audio: 'صوت',
     playPronunciation: (label: string, shortLabel: string) => `تشغيل نطق ${label} بلهجة ${shortLabel}`,
     pronunciationUnavailable: 'تشغيل النطق غير متاح في هذا المتصفح',
@@ -829,9 +833,34 @@ function AllDaysOverview({ days, reviewed, completedDays, onSelectDay }: { days:
   );
 }
 
-function AllDaysDetail({ dayNumber, words, reviewed, onBack }: { dayNumber: number; words: EditableWord[]; reviewed: Set<number>; onBack: () => void }) {
+function AllDaysDetail({ dayNumber, words, reviewed, onBack, onMarkReviewed, onSaveWord }: { dayNumber: number; words: EditableWord[]; reviewed: Set<number>; onBack: () => void; onMarkReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
   const { language, t } = useLanguage();
+  const [flashcardMode, setFlashcardMode] = useState(false);
+  const [flashcardIndex, setFlashcardIndex] = useState(0);
+  const [revealed, setRevealed] = useState(false);
   const reviewedCount = words.filter((word) => reviewed.has(word.id)).length;
+  const currentWord = words[flashcardIndex] ?? words[0];
+  const startFlashcardMode = () => {
+    setFlashcardIndex(0);
+    setRevealed(false);
+    setFlashcardMode(true);
+  };
+  const leaveFlashcardMode = () => {
+    setRevealed(false);
+    setFlashcardMode(false);
+  };
+  const nextFlashcard = () => {
+    setRevealed(false);
+    setFlashcardIndex((current) => (current + 1) % words.length);
+  };
+  const previousFlashcard = () => {
+    setRevealed(false);
+    setFlashcardIndex((current) => (current - 1 + words.length) % words.length);
+  };
+  const shuffleFlashcards = () => {
+    setRevealed(false);
+    setFlashcardIndex(Math.floor(Math.random() * words.length));
+  };
   return (
     <section className="animate-rise" data-testid="section-all-days-detail">
        <button type="button" data-testid="button-all-days-back" onClick={onBack} className="inline-flex items-center gap-2 rounded-full border border-[#d6d1c6] bg-[#fbf8f1] px-3.5 py-2 text-xs font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]">
@@ -843,37 +872,73 @@ function AllDaysDetail({ dayNumber, words, reviewed, onBack }: { dayNumber: numb
            <h1 className="mt-2 font-display text-[clamp(2.8rem,5vw,4.8rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-day-detail">{t.dayLabel(dayNumber)}</h1>
            <p className="mt-3 font-arabic text-sm text-[#71776f]" dir="rtl">{language === 'ar' ? `${t.dayLabel(dayNumber)} · ${t.wordsCount(words.length)}` : `اليوم ${dayNumber} · ${words.length} كلمة`}</p>
         </div>
-        <div className={`rounded-2xl border border-[#ded8ca] bg-[#f5edda] px-4 py-3 ${language === 'ar' ? 'text-right md:text-left' : 'text-left md:text-right'}`}>
-           <div className="font-mono-custom text-[9px] uppercase tracking-[.16em] text-[#858982]">{t.progress}</div>
-           <div className="mt-1 font-display text-2xl text-[#202a40]">{reviewedCount} <span className="font-sans text-xs text-[#71776f]">/ {words.length} {t.reviewed}</span></div>
+         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+           <button type="button" data-testid="button-flashcard-mode" onClick={startFlashcardMode} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#202a40] px-4 py-2.5 text-xs font-semibold text-[#f9f5e9] shadow-[3px_3px_0_#aab1b8] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852]">
+             <Layers3 size={14} /> {t.flashcardMode}
+           </button>
+           <div className={`rounded-2xl border border-[#ded8ca] bg-[#f5edda] px-4 py-3 ${language === 'ar' ? 'text-right md:text-left' : 'text-left md:text-right'}`}>
+              <div className="font-mono-custom text-[9px] uppercase tracking-[.16em] text-[#858982]">{t.progress}</div>
+              <div className="mt-1 font-display text-2xl text-[#202a40]">{reviewedCount} <span className="font-sans text-xs text-[#71776f]">/ {words.length} {t.reviewed}</span></div>
+           </div>
         </div>
       </div>
-      <div className="mt-7 overflow-hidden rounded-2xl border border-[#ded8ca] bg-[#fbf8f1]" data-testid="list-all-days-words">
-        {words.map((word, wordIndex) => (
-          <article key={word.id} data-testid={`card-all-days-word-${word.id}`} className="grid gap-3 border-b border-[#e8e2d7] px-4 py-4 last:border-b-0 sm:grid-cols-[44px_minmax(0,1fr)_auto] sm:items-center sm:gap-5 sm:px-6">
-            <span className="font-mono-custom text-[10px] text-[#afb1a8]">{String(wordIndex + 1).padStart(2, '0')}</span>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-display text-[25px] leading-none tracking-[-.02em] text-[#202a40]">{word.word}</h2>
-                 <span className="rounded-full bg-[#e9e3d7] px-2 py-1 font-mono-custom text-[9px] uppercase text-[#666d65]">{displayPartOfSpeech(word.type, language)}</span>
-              </div>
-              <p className="font-arabic mt-2 text-sm text-[#24635f]" dir="rtl">{word.translation}</p>
-            </div>
-            <div className="flex items-center gap-3 sm:justify-end">
-              <span className={`rounded-full px-2.5 py-1 font-mono-custom text-[10px] ${word.level === 'A1' ? 'bg-[#d9eee9] text-[#24635f]' : word.level === 'A2' ? 'bg-[#e5e9d2] text-[#5d6732]' : word.level === 'B1' ? 'bg-[#f8e7ba] text-[#7d5b19]' : 'bg-[#f7d8cd] text-[#a04b39]'}`}>{word.level}</span>
-               {reviewed.has(word.id) && <span className="inline-flex items-center gap-1 font-mono-custom text-[9px] uppercase tracking-[.1em] text-[#24635f]"><Check size={12} /> {t.reviewed}</span>}
-            </div>
-          </article>
-        ))}
-      </div>
+       {flashcardMode ? (
+         <div className="mt-7" data-testid="panel-day-flashcard-session">
+           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+             <button type="button" data-testid="button-flashcard-back-to-list" onClick={leaveFlashcardMode} className="inline-flex items-center gap-2 rounded-full border border-[#d6d1c6] bg-[#fbf8f1] px-3.5 py-2 text-xs font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]">
+               <ArrowLeft size={14} /> {t.returnToDayList}
+             </button>
+             <span className="font-mono-custom text-[10px] uppercase tracking-[.16em] text-[#858982]">{t.wordsCount(words.length)}</span>
+           </div>
+           {currentWord && (
+             <>
+               <Flashcard
+                 word={currentWord}
+                 revealed={revealed}
+                 onReveal={() => setRevealed(true)}
+                 onNext={nextFlashcard}
+                 onPrevious={previousFlashcard}
+                 onShuffle={shuffleFlashcards}
+                 current={flashcardIndex}
+                 total={words.length}
+                 isReviewed={reviewed.has(currentWord.id)}
+                 onMarkReviewed={() => onMarkReviewed(currentWord.id)}
+                 onSaveWord={onSaveWord}
+               />
+               <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-[#9a9e94]" data-testid="text-day-flashcard-keyboard-hint">
+                 <span className="rounded border border-[#d8d2c6] bg-[#fbf8f1] px-1.5 py-0.5 font-mono-custom text-[10px]">space</span> {t.keyboardHint} <span className="mx-1 text-[#c5c0b5]">·</span> <span className="rounded border border-[#d8d2c6] bg-[#fbf8f1] px-1.5 py-0.5 font-mono-custom text-[10px]">← →</span> {t.keyboardMove}
+               </div>
+             </>
+           )}
+         </div>
+       ) : (
+         <div className="mt-7 overflow-hidden rounded-2xl border border-[#ded8ca] bg-[#fbf8f1]" data-testid="list-all-days-words">
+           {words.map((word, wordIndex) => (
+             <article key={word.id} data-testid={`card-all-days-word-${word.id}`} className="grid gap-3 border-b border-[#e8e2d7] px-4 py-4 last:border-b-0 sm:grid-cols-[44px_minmax(0,1fr)_auto] sm:items-center sm:gap-5 sm:px-6">
+               <span className="font-mono-custom text-[10px] text-[#afb1a8]">{String(wordIndex + 1).padStart(2, '0')}</span>
+               <div className="min-w-0">
+                 <div className="flex flex-wrap items-center gap-2">
+                   <h2 className="font-display text-[25px] leading-none tracking-[-.02em] text-[#202a40]">{word.word}</h2>
+                    <span className="rounded-full bg-[#e9e3d7] px-2 py-1 font-mono-custom text-[9px] uppercase text-[#666d65]">{displayPartOfSpeech(word.type, language)}</span>
+                 </div>
+                 <p className="font-arabic mt-2 text-sm text-[#24635f]" dir="rtl">{word.translation}</p>
+               </div>
+               <div className="flex items-center gap-3 sm:justify-end">
+                  <span className={`rounded-full px-2.5 py-1 font-mono-custom text-[10px] ${word.level === 'A1' ? 'bg-[#d9eee9] text-[#24635f]' : word.level === 'A2' ? 'bg-[#e5e9d2] text-[#5d6732]' : word.level === 'B1' ? 'bg-[#f8e7ba] text-[#7d5b19]' : 'bg-[#f7d8cd] text-[#a04b39]'}`}>{word.level}</span>
+                  {reviewed.has(word.id) && <span className="inline-flex items-center gap-1 font-mono-custom text-[9px] uppercase tracking-[.1em] text-[#24635f]"><Check size={12} /> {t.reviewed}</span>}
+               </div>
+             </article>
+           ))}
+         </div>
+       )}
     </section>
   );
 }
 
-function AllDaysView({ days, reviewed, completedDays, selectedDayIndex, onSelectDay, onBack }: { days: EditableWord[][]; reviewed: Set<number>; completedDays: Set<number>; selectedDayIndex: number | null; onSelectDay: (dayIndex: number) => void; onBack: () => void }) {
+function AllDaysView({ days, reviewed, completedDays, selectedDayIndex, onSelectDay, onBack, onMarkReviewed, onSaveWord }: { days: EditableWord[][]; reviewed: Set<number>; completedDays: Set<number>; selectedDayIndex: number | null; onSelectDay: (dayIndex: number) => void; onBack: () => void; onMarkReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
   const selectedDay = selectedDayIndex === null ? undefined : days[selectedDayIndex];
   if (selectedDay && selectedDayIndex !== null) {
-    return <AllDaysDetail dayNumber={selectedDayIndex + 1} words={selectedDay} reviewed={reviewed} onBack={onBack} />;
+    return <AllDaysDetail dayNumber={selectedDayIndex + 1} words={selectedDay} reviewed={reviewed} onBack={onBack} onMarkReviewed={onMarkReviewed} onSaveWord={onSaveWord} />;
   }
   return <AllDaysOverview days={days} reviewed={reviewed} completedDays={completedDays} onSelectDay={onSelectDay} />;
 }
@@ -1025,7 +1090,7 @@ function Home() {
        <main className="app-main ml-0 px-5 pb-16 pt-9 md:ml-[264px] md:px-10 md:pt-12">
         <div className="mx-auto max-w-[1250px]">
           {view === 'all-days' ? (
-            <AllDaysView days={days} reviewed={reviewed} completedDays={completedDays} selectedDayIndex={selectedDayIndex} onSelectDay={selectDay} onBack={() => setSelectedDayIndex(null)} />
+            <AllDaysView days={days} reviewed={reviewed} completedDays={completedDays} selectedDayIndex={selectedDayIndex} onSelectDay={selectDay} onBack={() => setSelectedDayIndex(null)} onMarkReviewed={markReviewed} onSaveWord={saveWord} />
           ) : (
             <>
            <div className="animate-rise mb-9 flex flex-col justify-between gap-5 md:flex-row md:items-end">
