@@ -1,0 +1,1 @@
+- [Artifact build environment](build-environment.md) — manual Vite builds for path-routed artifacts need the same PORT and BASE_PATH values declared by artifact configuration.

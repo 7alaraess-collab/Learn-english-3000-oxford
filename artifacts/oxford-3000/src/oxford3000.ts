@@ -7114,9 +7114,9 @@ export const oxford3000 = [
     "word": "double",
     "type": "Adverb",
     "level": "B1",
-    "translation": "كلمة ",
+    "translation": "مزدوج؛ ضعف",
     "example": "The recipe needs a double amount of flour.",
-    "exampleTranslation": "مثال على الاستخدام: كلمة ."
+    "exampleTranslation": "تحتاج الوصفة إلى ضعف كمية الدقيق."
   },
   {
     "id": 792,
@@ -13720,9 +13720,9 @@ export const oxford3000 = [
     "word": "light",
     "type": "Adjective / Verb",
     "level": "A2",
-    "translation": "كلمة ",
+    "translation": "يُشعل؛ يُنير",
     "example": "Please light the candle before dinner.",
-    "exampleTranslation": "مثال على الاستخدام: كلمة ."
+    "exampleTranslation": "من فضلك أشعل الشمعة قبل العشاء."
   },
   {
     "id": 1526,
@@ -13747,9 +13747,9 @@ export const oxford3000 = [
     "word": "line",
     "type": "Noun",
     "level": "B1",
-    "translation": "كلمة ",
+    "translation": "خط؛ طابور",
     "example": "There was a long line outside the shop.",
-    "exampleTranslation": "مثال على الاستخدام: كلمة ."
+    "exampleTranslation": "كان هناك طابور طويل خارج المتجر."
   },
   {
     "id": 1529,
@@ -14449,9 +14449,9 @@ export const oxford3000 = [
     "word": "match",
     "type": "Verb",
     "level": "A1",
-    "translation": "كلمة ",
+    "translation": "مباراة؛ تطابق",
     "example": "This scarf is a perfect match for your coat.",
-    "exampleTranslation": "مثال على الاستخدام: كلمة ."
+    "exampleTranslation": "هذا الوشاح يطابق معطفك تمامًا."
   },
   {
     "id": 1607,
@@ -15934,9 +15934,9 @@ export const oxford3000 = [
     "word": "number",
     "type": "Number / Noun / Verb",
     "level": "A2",
-    "translation": "كلمة ",
+    "translation": "رقم؛ عدد",
     "example": "Please write your phone number here.",
-    "exampleTranslation": "مثال على الاستخدام: كلمة ."
+    "exampleTranslation": "من فضلك اكتب رقم هاتفك هنا."
   },
   {
     "id": 1772,
@@ -18607,9 +18607,9 @@ export const oxford3000 = [
     "word": "pronounce",
     "type": "Verb",
     "level": "A2",
-    "translation": "كلمة ",
+    "translation": "ينطق",
     "example": "Can you pronounce this word clearly?",
-    "exampleTranslation": "مثال على الاستخدام: كلمة ."
+    "exampleTranslation": "هل يمكنك نطق هذه الكلمة بوضوح؟"
   },
   {
     "id": 2069,
@@ -20893,9 +20893,9 @@ export const oxford3000 = [
     "word": "second2 (after first)",
     "type": "Number / Adverb",
     "level": "A2",
-    "translation": "كلمة ",
+    "translation": "الثاني؛ المرتبة الثانية",
     "example": "She finished second in the race.",
-    "exampleTranslation": "مثال على الاستخدام: كلمة ."
+    "exampleTranslation": "أنهت السباق في المرتبة الثانية."
   },
   {
     "id": 2323,

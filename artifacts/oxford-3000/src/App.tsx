@@ -12,6 +12,48 @@ const queryClient = new QueryClient();
 
 const levelOptions = ['All levels', 'A1', 'A2', 'B1', 'B2'];
 const typeOptions = ['All parts', 'Noun', 'Verb', 'Adjective', 'Adverb', 'Preposition'];
+const reviewedStorageKey = 'wordroom-reviewed';
+const reviewDatesStorageKey = 'wordroom-review-dates';
+const dailyGoal = 12;
+
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function readReviewedIds() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(reviewedStorageKey) ?? '[]') as unknown;
+    if (!Array.isArray(saved)) return new Set<number>();
+    const validIds = new Set<number>(oxford3000.map((word) => word.id));
+    return new Set(saved.filter((id): id is number => typeof id === 'number' && validIds.has(id)));
+  } catch {
+    return new Set<number>();
+  }
+}
+
+function readReviewDates() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(reviewDatesStorageKey) ?? '{}') as unknown;
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {};
+    return Object.fromEntries(Object.entries(saved).filter(([, date]) => typeof date === 'string')) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+function getCurrentStreak(reviewDates: Record<string, string>) {
+  const activeDays = new Set(Object.values(reviewDates));
+  let streak = 0;
+  const cursor = new Date();
+  while (activeDays.has(localDateKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
 
 function Logo() {
   return (
@@ -28,7 +70,7 @@ function Logo() {
   );
 }
 
-function Sidebar({ view, setView, mobileOpen, closeMobile, onReset }: { view: 'study' | 'browse'; setView: (view: 'study' | 'browse') => void; mobileOpen: boolean; closeMobile: () => void; onReset: () => void }) {
+function Sidebar({ view, setView, mobileOpen, closeMobile, onReset, reviewedToday }: { view: 'study' | 'browse'; setView: (view: 'study' | 'browse') => void; mobileOpen: boolean; closeMobile: () => void; onReset: () => void; reviewedToday: number }) {
   const nav = [
     { id: 'study' as const, label: 'Study room', arabic: 'غرفة الدراسة', icon: Sparkles },
     { id: 'browse' as const, label: 'Word library', arabic: 'مكتبة الكلمات', icon: Layers3 },
@@ -61,13 +103,13 @@ function Sidebar({ view, setView, mobileOpen, closeMobile, onReset }: { view: 's
         </div>
         <div className="mt-auto rounded-2xl border border-[#3a465e] bg-[#29354e] p-4">
           <div className="flex items-center justify-between">
-            <span className="font-mono-custom text-[10px] uppercase tracking-[0.15em] text-[#9da8b3]">Daily rhythm</span>
-            <span className="text-[11px] font-semibold text-[#f3d24f]">6 / 12</span>
+             <span className="font-mono-custom text-[10px] uppercase tracking-[0.15em] text-[#9da8b3]">Daily rhythm</span>
+             <span className="text-[11px] font-semibold text-[#f3d24f]">{Math.min(reviewedToday, dailyGoal)} / {dailyGoal}</span>
           </div>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#1d273a]">
-            <div className="h-full w-1/2 rounded-full bg-[#ef7657]" />
+             <div className="h-full rounded-full bg-[#ef7657] transition-all duration-500" style={{ width: `${Math.min(100, (reviewedToday / dailyGoal) * 100)}%` }} />
           </div>
-          <p className="mt-3 text-xs leading-relaxed text-[#aab3bd]">Six words in. Your streak is waiting.</p>
+           <p className="mt-3 text-xs leading-relaxed text-[#aab3bd]">{reviewedToday >= dailyGoal ? 'Daily rhythm complete. Beautiful work.' : `${dailyGoal - reviewedToday} ${dailyGoal - reviewedToday === 1 ? 'word' : 'words'} left in today’s rhythm.`}</p>
           <button type="button" data-testid="button-reset-session" onClick={onReset} className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#dce1dc] transition-colors hover:text-[#f3d24f]">
             <RotateCcw size={12} /> Reset session
           </button>
@@ -79,11 +121,12 @@ function Sidebar({ view, setView, mobileOpen, closeMobile, onReset }: { view: 's
 }
 
 function TopBar({ view, setView, openMenu }: { view: 'study' | 'browse'; setView: (view: 'study' | 'browse') => void; openMenu: () => void }) {
+  const formattedDate = new Intl.DateTimeFormat('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
   return (
     <header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-[#ded8ca] bg-[#f6f2e9]/90 px-5 backdrop-blur-md md:ml-[264px] md:px-10">
       <div className="flex items-center gap-3">
         <button type="button" data-testid="button-open-menu" onClick={openMenu} className="rounded-lg p-2 text-[#202a40] hover:bg-[#e9e3d7] md:hidden" aria-label="Open menu"><Menu size={20} /></button>
-        <div className="font-mono-custom text-[10px] uppercase tracking-[0.18em] text-[#858982]">Wednesday · 14 May 2025</div>
+        <div className="font-mono-custom text-[10px] uppercase tracking-[0.18em] text-[#858982]">{formattedDate}</div>
       </div>
       <div className="flex items-center gap-2">
         <button type="button" data-testid="button-top-study" onClick={() => setView('study')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'study' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>Study</button>
@@ -244,7 +287,7 @@ function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, markReviewe
         <div className="rounded-2xl border border-[#ded8ca] bg-[#fbf8f1] p-5">
           <div className="flex items-center justify-between"><h3 className="font-semibold text-[#202a40]">Level map</h3><span className="font-mono-custom text-[9px] uppercase tracking-[.14em] text-[#858982]">Words</span></div>
           <div className="mt-5 space-y-4">
-            {['A1', 'A2', 'B1', 'B2'].map((level, index) => { const count = oxford3000.filter((word) => word.level === level).length; return <div key={level} className="flex items-center gap-3"><span className="w-6 font-mono-custom text-[10px] text-[#858982]">{level}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-[#e9e3d7]"><div className={`h-full rounded-full ${index === 0 ? 'w-[83%] bg-[#24635f]' : index === 1 ? 'w-[68%] bg-[#6e9d83]' : index === 2 ? 'w-[49%] bg-[#e5ad48]' : 'w-[22%] bg-[#ef7657]'}`} /></div><span className="w-5 text-right font-mono-custom text-[10px] text-[#858982]">{count}</span></div>; })}
+             {['A1', 'A2', 'B1', 'B2'].map((level, index) => { const count = oxford3000.filter((word) => word.level === level).length; const maxLevelCount = 800; return <div key={level} className="flex items-center gap-3"><span className="w-6 font-mono-custom text-[10px] text-[#858982]">{level}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-[#e9e3d7]"><div className={`h-full rounded-full ${index === 0 ? 'bg-[#24635f]' : index === 1 ? 'bg-[#6e9d83]' : index === 2 ? 'bg-[#e5ad48]' : 'bg-[#ef7657]'}`} style={{ width: `${(count / maxLevelCount) * 100}%` }} /></div><span className="w-8 text-right font-mono-custom text-[10px] text-[#858982]">{count}</span></div>; })}
           </div>
           <button type="button" data-testid="button-view-library" onClick={() => document.getElementById('library')?.scrollIntoView({ behavior: 'smooth' })} className="mt-6 flex w-full items-center justify-between border-t border-[#e8e2d7] pt-4 text-xs font-semibold text-[#24635f] hover:text-[#ef7657]">Explore all words <ArrowRight size={14} /></button>
         </div>
@@ -265,9 +308,11 @@ function Home() {
   const [level, setLevel] = useState('All levels');
   const [part, setPart] = useState('All parts');
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [reviewed, setReviewed] = useState<Set<number>>(() => {
-    try { return new Set(JSON.parse(window.localStorage.getItem('wordroom-reviewed') ?? '[]') as number[]); } catch { return new Set(); }
-  });
+  const [reviewed, setReviewed] = useState<Set<number>>(readReviewedIds);
+  const [reviewDates, setReviewDates] = useState<Record<string, string>>(readReviewDates);
+  const today = localDateKey();
+  const reviewedToday = Object.values(reviewDates).filter((date) => date === today).length;
+  const currentStreak = getCurrentStreak(reviewDates);
   const filteredWords = useMemo(() => {
     const normalized = search.trim().toLocaleLowerCase();
     return oxford3000.filter((word) => {
@@ -278,21 +323,41 @@ function Home() {
     });
   }, [search, level, part]);
   useEffect(() => { if (currentIndex >= filteredWords.length) setCurrentIndex(0); }, [currentIndex, filteredWords.length]);
-  const markReviewed = (id: number) => setReviewed((existing) => { const next = new Set(existing); next.add(id); window.localStorage.setItem('wordroom-reviewed', JSON.stringify([...next])); return next; });
+  const markReviewed = (id: number) => {
+    setReviewed((existing) => {
+      const next = new Set(existing);
+      next.add(id);
+      window.localStorage.setItem(reviewedStorageKey, JSON.stringify([...next]));
+      return next;
+    });
+    setReviewDates((existing) => {
+      const next = { ...existing, [id]: today };
+      window.localStorage.setItem(reviewDatesStorageKey, JSON.stringify(next));
+      return next;
+    });
+  };
   const selectWord = (word: OxfordWord) => { const index = filteredWords.findIndex((item) => item.id === word.id); setCurrentIndex(Math.max(index, 0)); setView('study'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const resetSession = () => {
+    setReviewed(new Set());
+    setReviewDates({});
+    window.localStorage.removeItem(reviewedStorageKey);
+    window.localStorage.removeItem(reviewDatesStorageKey);
+  };
+  const nextMilestone = reviewed.size >= oxford3000.length ? oxford3000.length : Math.min(oxford3000.length, Math.ceil((reviewed.size + 1) / 200) * 200);
+  const wordsToMilestone = Math.max(0, nextMilestone - reviewed.size);
   return (
     <div className="paper-grain min-h-[100dvh] bg-[#f6f2e9]">
-      <Sidebar view={view} setView={setView} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} onReset={() => { setReviewed(new Set()); window.localStorage.removeItem('wordroom-reviewed'); }} />
+      <Sidebar view={view} setView={setView} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} onReset={resetSession} reviewedToday={reviewedToday} />
       <TopBar view={view} setView={setView} openMenu={() => setMobileOpen(true)} />
       <main className="ml-0 px-5 pb-16 pt-9 md:ml-[264px] md:px-10 md:pt-12">
         <div className="mx-auto max-w-[1250px]">
           <div className="animate-rise mb-9 flex flex-col justify-between gap-5 md:flex-row md:items-end">
             <div><div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.21em] text-[#24635f]"><span className="h-2 w-2 rounded-full bg-[#ef7657]" /> Your learning desk</div><h1 className="mt-3 max-w-[620px] font-display text-[clamp(2.6rem,5.3vw,4.7rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-page">{view === 'study' ? <>Make room for <em className="text-[#24635f]">better English.</em></> : <>Every word has a <em className="text-[#24635f]">place.</em></>}</h1><p className="mt-4 max-w-[470px] text-[14px] leading-relaxed text-[#71776f]">{view === 'study' ? 'A calm, focused practice for Arabic speakers. Meet a word, meet it again, then make it yours.' : 'Search the Oxford 3000 by meaning, level, or part of speech. Your next useful word is nearby.'}</p></div>
-            <div className="flex items-center gap-2 text-right"><div><div className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">Current streak</div><div className="mt-1 text-sm font-semibold text-[#202a40]">4 days <span className="ml-1 text-[#ef7657]">/</span> keep going</div></div><div className="ml-2 flex h-11 w-11 items-center justify-center rounded-full border border-[#e6c94d] bg-[#f3d24f] font-display text-xl text-[#202a40]">4</div></div>
+            <div className="flex items-center gap-2 text-right"><div><div className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">Current streak</div><div className="mt-1 text-sm font-semibold text-[#202a40]">{currentStreak} {currentStreak === 1 ? 'day' : 'days'} <span className="ml-1 text-[#ef7657]">/</span> {currentStreak ? 'keep going' : 'start today'}</div></div><div className="ml-2 flex h-11 w-11 items-center justify-center rounded-full border border-[#e6c94d] bg-[#f3d24f] font-display text-xl text-[#202a40]">{currentStreak}</div></div>
           </div>
-           <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-4"><StatCard label="Words met" value={String(reviewed.size)} detail="of 3,000 in your goal" accent="bg-[#24635f]" /><StatCard label="In this view" value={String(filteredWords.length)} detail="matching your filters" accent="bg-[#ef7657]" /><StatCard label="Daily rhythm" value={`${Math.min(reviewed.size, 12)} / 12`} detail="words in today's session" accent="bg-[#f3d24f]" /><StatCard label="Next milestone" value={String(Math.max(200, reviewed.size + (200 - (reviewed.size % 200))))} detail={`${Math.max(0, 200 - (reviewed.size % 200))} words to go`} accent="bg-[#779c7b]" /></div>
+            <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-4"><StatCard label="Words met" value={String(reviewed.size)} detail="of 3,000 in your goal" accent="bg-[#24635f]" /><StatCard label="In this view" value={String(filteredWords.length)} detail="matching your filters" accent="bg-[#ef7657]" /><StatCard label="Daily rhythm" value={`${Math.min(reviewedToday, dailyGoal)} / ${dailyGoal}`} detail="words in today's session" accent="bg-[#f3d24f]" /><StatCard label="Next milestone" value={reviewed.size >= oxford3000.length ? 'Complete' : String(nextMilestone)} detail={reviewed.size >= oxford3000.length ? 'Oxford 3000 finished' : `${wordsToMilestone} words to go`} accent="bg-[#779c7b]" /></div>
           <Filters search={search} setSearch={setSearch} level={level} setLevel={setLevel} part={part} setPart={setPart} resultCount={filteredWords.length} />
-          <div className="mt-8" id="library">{view === 'study' ? <StudyHome words={filteredWords} currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} reviewed={reviewed} markReviewed={markReviewed} /> : <BrowseList words={filteredWords} onSelect={selectWord} />}</div>
+           <div className="mt-8" id="library">{view === 'study' ? <StudyHome words={filteredWords} currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} reviewed={reviewed} markReviewed={markReviewed} /> : <BrowseList words={filteredWords} onSelect={selectWord} />}</div>
         </div>
       </main>
     </div>
