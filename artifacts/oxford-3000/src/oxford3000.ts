@@ -440,6 +440,15 @@
       "example": "They advertised the event on TV.",
       "exampleTranslation": "أعلنوا عن الحدث في التلفزيون."
     },
+  {
+    "id": 50,
+    "word": "advertisement",
+    "type": "Noun",
+    "level": "A2",
+    "translation": "الإعلانات",
+    "example": "The advertisement was very effective.",
+    "exampleTranslation": "كان الإعلان فعالاً للغاية."
+  },
     {
     "id": 51,
       "word": "advertising",
@@ -4795,6 +4804,150 @@
     "translation": "يركز",
     "example": "She needs to concentrate on her studies.",
     "exampleTranslation": "تحتاج للتركيز على دراستها."
+  },
+  {
+    "id": 535,
+    "word": "concentration",
+    "type": "Noun",
+    "level": "B2",
+    "translation": "كلمة concentration",
+    "example": "This task requires full concentration.",
+    "exampleTranslation": "مثال على الاستخدام: كلمة concentration."
+  },
+  {
+    "id": 536,
+    "word": "concept",
+    "type": "Noun",
+    "level": "B2",
+    "translation": "كلمة concept",
+    "example": "The concept of freedom is central to the story.",
+    "exampleTranslation": "مثال على الاستخدام: كلمة concept."
+  },
+  {
+    "id": 537,
+    "word": "concern",
+    "type": "Noun / Verb",
+    "level": "B2",
+    "translation": "كلمة concern",
+    "example": "This matter concerns us all.",
+    "exampleTranslation": "مثال على الاستخدام: كلمة concern."
+  },
+  {
+    "id": 538,
+    "word": "concerned",
+    "type": "Adjective",
+    "level": "B2",
+    "translation": "كلمة concerned",
+    "example": "She is concerned about his health.",
+    "exampleTranslation": "مثال على الاستخدام: كلمة concerned."
+  },
+  {
+    "id": 539,
+    "word": "concert",
+    "type": "Noun",
+    "level": "A1",
+    "translation": "كلمة concert",
+    "example": "They went to a rock concert.",
+    "exampleTranslation": "مثال على الاستخدام: كلمة concert."
+  },
+  {
+    "id": 540,
+    "word": "conclude",
+    "type": "Verb",
+    "level": "B1",
+    "translation": "كلمة conclude",
+    "example": "They concluded the meeting.",
+    "exampleTranslation": "مثال على الاستخدام: كلمة conclude."
+  },
+  {
+    "id": 541,
+    "word": "conclusion",
+    "type": "Noun",
+    "level": "B1",
+    "translation": "كلمة conclusion",
+    "example": "The conclusion of the trial was unexpected.",
+    "exampleTranslation": "مثال على الاستخدام: كلمة conclusion."
+  },
+  {
+    "id": 542,
+    "word": "condition",
+    "type": "Noun",
+    "level": "A2",
+    "translation": "كلمة condition",
+    "example": "The car is in good condition.",
+    "exampleTranslation": "مثال على الاستخدام: كلمة condition."
+  },
+  {
+    "id": 543,
+    "word": "conduct",
+    "type": "Verb / Noun",
+    "level": "B2",
+    "translation": "كلمة conduct",
+    "example": "They conduct business in an ethical manner.",
+    "exampleTranslation": "مثال على الاستخدام: كلمة conduct."
+  },
+  {
+    "id": 544,
+    "word": "conference",
+    "type": "Noun",
+    "level": "A2",
+    "translation": "كلمة conference",
+    "example": "She attended a conference on climate change.",
+    "exampleTranslation": "مثال على الاستخدام: كلمة conference."
+  },
+  {
+    "id": 545,
+    "word": "confidence",
+    "type": "Noun",
+    "level": "B2",
+    "translation": "كلمة confidence",
+    "example": "He has confidence in his abilities.",
+    "exampleTranslation": "مثال على الاستخدام: كلمة confidence."
+  },
+  {
+    "id": 546,
+    "word": "confident",
+    "type": "Adjective",
+    "level": "B1",
+    "translation": "كلمة confident",
+    "example": "She is confident in her decision.",
+    "exampleTranslation": "مثال على الاستخدام: كلمة confident."
+  },
+  {
+    "id": 547,
+    "word": "confirm",
+    "type": "Verb",
+    "level": "B1",
+    "translation": "كلمة confirm",
+    "example": "Can you confirm your attendance?",
+    "exampleTranslation": "مثال على الاستخدام: كلمة confirm."
+  },
+  {
+    "id": 548,
+    "word": "conflict",
+    "type": "Noun / Verb",
+    "level": "B2",
+    "translation": "كلمة conflict",
+    "example": "The conflict between the two countries has escalated.",
+    "exampleTranslation": "مثال على الاستخدام: كلمة conflict."
+  },
+  {
+    "id": 549,
+    "word": "confuse",
+    "type": "Verb",
+    "level": "B1",
+    "translation": "كلمة confuse",
+    "example": "The instructions confused me.",
+    "exampleTranslation": "مثال على الاستخدام: كلمة confuse."
+  },
+  {
+    "id": 550,
+    "word": "confused",
+    "type": "Adjective",
+    "level": "B1",
+    "translation": "كلمة confused",
+    "example": "He looked confused when I asked him the question.",
+    "exampleTranslation": "مثال على الاستخدام: كلمة confused."
   },
   {
    "id": 551,
