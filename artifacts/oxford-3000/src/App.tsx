@@ -177,6 +177,9 @@ const translations = {
     quizProgress: (current: number, total: number) => `Word ${current} of ${total}`,
     spellTheWord: 'Spell the word',
     tapLetters: 'Tap the letters in order',
+    hint: 'Hint',
+    hintDescription: 'Reveal the answer as a learning aid. This attempt will not count as correct.',
+    removePlacedLetter: (letter: string) => `Remove ${letter} from the answer`,
     clearAnswer: 'Clear answer',
     checkAnswer: 'Check answer',
     correct: 'Correct',
@@ -314,6 +317,9 @@ const translations = {
     quizProgress: (current: number, total: number) => `الكلمة ${current} من ${total}`,
     spellTheWord: 'اكتب الكلمة',
     tapLetters: 'اضغط على الحروف بالترتيب',
+    hint: 'مساعدة',
+    hintDescription: 'أظهر الإجابة كوسيلة للتعلّم. لن تُحتسب هذه المحاولة كإجابة صحيحة.',
+    removePlacedLetter: (letter: string) => `إزالة الحرف ${letter} من الإجابة`,
     clearAnswer: 'مسح الإجابة',
     checkAnswer: 'تحقق من الإجابة',
     correct: 'صحيح',
@@ -501,10 +507,31 @@ function WordBuildingGame({ words, onDone }: { words: EditableWord[]; onDone: ()
   const [index, setIndex] = useState(0);
   const [answer, setAnswer] = useState<number[]>([]);
   const [checked, setChecked] = useState<boolean | null>(null);
+  const [revealed, setRevealed] = useState(false);
   const word = words[index] ?? words[0];
   const letters = useMemo(() => shuffleItems(word.word.toLowerCase().replace(/[^a-z]/g, '').split('')), [word.word]);
   const target = word.word.toLowerCase().replace(/[^a-z]/g, '');
-  useEffect(() => { setAnswer([]); setChecked(null); }, [word.id]);
+  const solution = useMemo(() => {
+    const used = new Set<number>();
+    return target.split('').map((character) => {
+      const letterIndex = letters.findIndex((letter, candidateIndex) => letter === character && !used.has(candidateIndex));
+      if (letterIndex === -1) return -1;
+      used.add(letterIndex);
+      return letterIndex;
+    });
+  }, [letters, target]);
+  const hintTimer = useRef<number | null>(null);
+  useEffect(() => {
+    setAnswer([]);
+    setChecked(null);
+    setRevealed(false);
+    return () => {
+      if (hintTimer.current !== null) {
+        window.clearTimeout(hintTimer.current);
+        hintTimer.current = null;
+      }
+    };
+  }, [word.id]);
   const submit = () => {
     if (answer.length !== letters.length) return;
     const typed = answer.map((letterIndex) => letters[letterIndex]).join('');
@@ -514,6 +541,15 @@ function WordBuildingGame({ words, onDone }: { words: EditableWord[]; onDone: ()
     if (index === words.length - 1) onDone();
     else setIndex((current) => current + 1);
   };
+  const revealAnswer = () => {
+    if (revealed || checked !== null) return;
+    setAnswer(solution);
+    setRevealed(true);
+    hintTimer.current = window.setTimeout(() => {
+      hintTimer.current = null;
+      next();
+    }, 1400);
+  };
   return (
     <div data-testid="quiz-game-word-building">
       <div className="mt-7 rounded-[26px] border border-[#d4cec0] bg-[#fbf8f1] p-6 shadow-[0_14px_34px_rgba(31,41,55,.06)] sm:p-10">
@@ -522,17 +558,28 @@ function WordBuildingGame({ words, onDone }: { words: EditableWord[]; onDone: ()
           <div className="font-mono-custom text-[10px] uppercase tracking-[.18em] text-[#858982]">{t.spellTheWord}</div>
           <div className="font-arabic mt-4 text-[clamp(2rem,5vw,3.2rem)] font-semibold text-[#24635f]" dir="rtl">{word.translation}</div>
           <p className="mt-3 text-sm text-[#858982]">{t.tapLetters}</p>
-          <div className="mt-9 flex min-h-[58px] flex-wrap items-center justify-center gap-2" aria-label={t.spellTheWord}>
-            {letters.map((_, slotIndex) => <span key={slotIndex} className={`flex h-12 min-w-10 items-center justify-center border-b-2 px-2 font-display text-3xl text-[#202a40] ${answer[slotIndex] === undefined ? 'border-[#c6bfb1]' : 'border-[#24635f]'}`}>{answer[slotIndex] !== undefined ? letters[answer[slotIndex]] : '_'}</span>)}
+          <div className="mt-9 flex items-center justify-center gap-3">
+            <div className="flex min-h-[58px] flex-wrap items-center justify-center gap-2" aria-label={t.spellTheWord}>
+              {letters.map((_, slotIndex) => {
+                const placedLetterIndex = answer[slotIndex];
+                const placedLetter = placedLetterIndex === undefined ? null : letters[placedLetterIndex];
+                return placedLetter ? (
+                  <button type="button" key={slotIndex} data-testid={`button-placed-letter-${slotIndex}`} aria-label={t.removePlacedLetter(placedLetter)} disabled={checked === true || revealed} onClick={() => setAnswer((current) => current.filter((_, answerIndex) => answerIndex !== slotIndex))} className="flex h-12 min-w-10 items-center justify-center rounded-lg border-b-2 border-[#24635f] px-2 font-display text-3xl text-[#202a40] transition-colors hover:bg-[#edf7f3] disabled:cursor-not-allowed">{placedLetter}</button>
+                ) : (
+                  <span key={slotIndex} className="flex h-12 min-w-10 items-center justify-center border-b-2 border-[#c6bfb1] px-2 font-display text-3xl text-[#202a40]">_</span>
+                );
+              })}
+            </div>
+            <button type="button" data-testid="button-hint-word-building" aria-label={t.hint} disabled={checked === true || revealed} onClick={revealAnswer} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#d6d1c6] bg-[#f6f2e9] font-mono-custom text-sm text-[#737970] transition-all hover:border-[#24635f] hover:bg-[#edf7f3] hover:text-[#24635f] disabled:cursor-not-allowed disabled:opacity-40">?</button>
           </div>
           <div className="mx-auto mt-8 flex max-w-[520px] flex-wrap justify-center gap-2">
-            {letters.map((letter, letterIndex) => <button type="button" key={`${letter}-${letterIndex}`} data-testid={`button-letter-${letterIndex}`} disabled={answer.includes(letterIndex) || checked === true} onClick={() => setAnswer((current) => [...current, letterIndex])} className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#d6d1c6] bg-[#f6f2e9] font-display text-xl text-[#202a40] transition-all hover:-translate-y-0.5 hover:border-[#24635f] hover:bg-[#edf7f3] disabled:cursor-not-allowed disabled:opacity-35">{letter}</button>)}
+            {letters.map((letter, letterIndex) => <button type="button" key={`${letter}-${letterIndex}`} data-testid={`button-letter-${letterIndex}`} disabled={answer.includes(letterIndex) || checked === true || revealed} onClick={() => setAnswer((current) => [...current, letterIndex])} className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#d6d1c6] bg-[#f6f2e9] font-display text-xl text-[#202a40] transition-all hover:-translate-y-0.5 hover:border-[#24635f] hover:bg-[#edf7f3] disabled:cursor-not-allowed disabled:opacity-35">{letter}</button>)}
           </div>
         </div>
-        {checked !== null && <div className={`mx-auto mt-7 flex max-w-[520px] items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold ${checked ? 'bg-[#d9eee9] text-[#24635f]' : 'bg-[#fff4ef] text-[#a04b39]'}`} data-testid="text-word-building-feedback">{checked ? <><CheckCircle2 size={16} /> {t.correct}</> : <>{t.notQuite} — {t.tryAgain}</>}</div>}
+        {revealed ? <div className="mx-auto mt-7 max-w-[520px] rounded-xl bg-[#f5edda] px-4 py-3 text-center text-sm font-semibold text-[#7d5b19]" data-testid="text-word-building-hint-feedback">{t.hintDescription}</div> : checked !== null && <div className={`mx-auto mt-7 flex max-w-[520px] items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold ${checked ? 'bg-[#d9eee9] text-[#24635f]' : 'bg-[#fff4ef] text-[#a04b39]'}`} data-testid="text-word-building-feedback">{checked ? <><CheckCircle2 size={16} /> {t.correct}</> : <>{t.notQuite} — {t.tryAgain}</>}</div>}
         <div className="mt-8 flex flex-wrap justify-center gap-2">
-          <button type="button" data-testid="button-clear-word-answer" onClick={() => { setAnswer([]); setChecked(null); }} className="rounded-full border border-[#d6d1c6] px-4 py-2.5 text-xs font-semibold text-[#737970] transition-colors hover:bg-[#e9e3d7]">{t.clearAnswer}</button>
-          {checked === true ? <button type="button" data-testid="button-next-word-building" onClick={next} className="rounded-full bg-[#24635f] px-5 py-2.5 text-xs font-semibold text-[#f9f5e9]">{index === words.length - 1 ? t.finishQuiz : t.nextQuizWord} <ArrowRight size={14} className="ml-1 inline" /></button> : <button type="button" data-testid="button-check-word-answer" onClick={submit} disabled={answer.length !== letters.length} className="rounded-full bg-[#202a40] px-5 py-2.5 text-xs font-semibold text-[#f9f5e9] disabled:cursor-not-allowed disabled:opacity-40">{t.checkAnswer}</button>}
+          <button type="button" data-testid="button-clear-word-answer" onClick={() => { setAnswer([]); setChecked(null); }} disabled={revealed} className="rounded-full border border-[#d6d1c6] px-4 py-2.5 text-xs font-semibold text-[#737970] transition-colors hover:bg-[#e9e3d7] disabled:cursor-not-allowed disabled:opacity-40">{t.clearAnswer}</button>
+          {checked === true ? <button type="button" data-testid="button-next-word-building" onClick={next} className="rounded-full bg-[#24635f] px-5 py-2.5 text-xs font-semibold text-[#f9f5e9]">{index === words.length - 1 ? t.finishQuiz : t.nextQuizWord} <ArrowRight size={14} className="ml-1 inline" /></button> : <button type="button" data-testid="button-check-word-answer" onClick={submit} disabled={answer.length !== letters.length || revealed} className="rounded-full bg-[#202a40] px-5 py-2.5 text-xs font-semibold text-[#f9f5e9] disabled:cursor-not-allowed disabled:opacity-40">{t.checkAnswer}</button>}
         </div>
       </div>
     </div>
