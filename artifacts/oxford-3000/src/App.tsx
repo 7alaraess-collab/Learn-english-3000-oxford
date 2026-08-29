@@ -150,6 +150,11 @@ const translations = {
     previous: 'Previous',
     inYourRhythm: 'In your rhythm',
     iKnowThis: 'I know this',
+     gotIt: 'Got it',
+     reviewLater: 'Review Later',
+     dailySessionComplete: 'Daily session complete',
+     reviewRound: (round: number) => `Review round ${round}`,
+     wordsToReview: (count: number) => `${count} ${count === 1 ? 'word' : 'words'} to review again`,
     nextWord: 'Next word',
     searchEnglishArabic: 'Search English or Arabic',
     clearSearch: 'Clear search',
@@ -249,6 +254,11 @@ const translations = {
     previous: 'السابق',
     inYourRhythm: 'ضمن إيقاعك',
     iKnowThis: 'أعرف هذه الكلمة',
+     gotIt: 'تعلّمتها',
+     reviewLater: 'مراجعة لاحقًا',
+     dailySessionComplete: 'اكتملت الجلسة اليومية',
+     reviewRound: (round: number) => `جولة المراجعة ${round}`,
+     wordsToReview: (count: number) => `${count} ${count === 1 ? 'كلمة' : 'كلمات'} للمراجعة مجددًا`,
     nextWord: 'الكلمة التالية',
     searchEnglishArabic: 'ابحث بالإنجليزية أو العربية',
     clearSearch: 'مسح البحث',
@@ -576,7 +586,7 @@ function PronunciationButtons({ text, label, testIdPrefix }: { text: string; lab
   );
 }
 
-function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, current, total, isReviewed, onMarkReviewed, onSaveWord }: { word: EditableWord; revealed: boolean; onReveal: () => void; onNext: () => void; onPrevious: () => void; onShuffle: () => void; current: number; total: number; isReviewed: boolean; onMarkReviewed: () => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
+function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, current, total, isReviewed, onMarkReviewed, onSaveWord, sessionActions }: { word: EditableWord; revealed: boolean; onReveal: () => void; onNext: () => void; onPrevious: () => void; onShuffle: () => void; current: number; total: number; isReviewed: boolean; onMarkReviewed: () => void; onSaveWord: (id: number, changes: WordOverrides) => void; sessionActions?: { onGotIt: () => void; onReviewLater: () => void } }) {
   const { language, t } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<WordOverrides>({});
@@ -660,7 +670,14 @@ function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, cu
         </div>
         <div className="flex items-center justify-between border-t border-[#e4ded2] px-5 py-4 sm:px-9">
           <button type="button" data-testid="button-previous" onClick={onPrevious} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-[#737970] transition-colors hover:bg-[#eee8dc] hover:text-[#202a40]"><ArrowLeft size={15} /> {t.previous}</button>
-          <button type="button" data-testid="button-mark-known" onClick={onMarkReviewed} className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-all ${isReviewed ? 'bg-[#d9eee9] text-[#24635f]' : 'text-[#737970] hover:bg-[#f3d24f] hover:text-[#202a40]'}`}><Check size={14} /> {isReviewed ? t.inYourRhythm : t.iKnowThis}</button>
+           {sessionActions ? (
+             <div className="flex flex-wrap items-center justify-center gap-2">
+               <button type="button" data-testid="button-got-it" onClick={sessionActions.onGotIt} className="inline-flex items-center gap-1.5 rounded-full bg-[#24635f] px-3.5 py-2 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#1c514e]"><Check size={14} /> {t.gotIt}</button>
+               <button type="button" data-testid="button-review-later" onClick={sessionActions.onReviewLater} className="inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] bg-[#f6f2e9] px-3.5 py-2 text-xs font-semibold text-[#5f675f] transition-colors hover:border-[#ef7657] hover:bg-[#fff4ef] hover:text-[#c14f39]"><RotateCcw size={13} /> {t.reviewLater}</button>
+             </div>
+           ) : (
+             <button type="button" data-testid="button-mark-known" onClick={onMarkReviewed} className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-all ${isReviewed ? 'bg-[#d9eee9] text-[#24635f]' : 'text-[#737970] hover:bg-[#f3d24f] hover:text-[#202a40]'}`}><Check size={14} /> {isReviewed ? t.inYourRhythm : t.iKnowThis}</button>
+           )}
           <button type="button" data-testid="button-next" onClick={onNext} className="flex items-center gap-2 rounded-lg bg-[#202a40] px-3.5 py-2.5 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852]">{t.nextWord} <ArrowRight size={15} /></button>
         </div>
       </div>
@@ -836,30 +853,71 @@ function AllDaysOverview({ days, reviewed, completedDays, onSelectDay }: { days:
 function AllDaysDetail({ dayNumber, words, reviewed, onBack, onMarkReviewed, onSaveWord }: { dayNumber: number; words: EditableWord[]; reviewed: Set<number>; onBack: () => void; onMarkReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
   const { language, t } = useLanguage();
   const [flashcardMode, setFlashcardMode] = useState(false);
+  const [sessionWordIds, setSessionWordIds] = useState<number[]>(words.map((word) => word.id));
   const [flashcardIndex, setFlashcardIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
+  const [reviewLaterIds, setReviewLaterIds] = useState<Set<number>>(new Set());
+  const [sessionRound, setSessionRound] = useState(1);
+  const [sessionComplete, setSessionComplete] = useState(false);
   const reviewedCount = words.filter((word) => reviewed.has(word.id)).length;
-  const currentWord = words[flashcardIndex] ?? words[0];
+  const sessionWords = sessionWordIds
+    .map((id) => words.find((word) => word.id === id))
+    .filter((word): word is EditableWord => Boolean(word));
+  const currentWord = sessionWords[flashcardIndex] ?? sessionWords[0];
   const startFlashcardMode = () => {
+    setSessionWordIds(words.map((word) => word.id));
     setFlashcardIndex(0);
     setRevealed(false);
+    setReviewLaterIds(new Set());
+    setSessionRound(1);
+    setSessionComplete(false);
     setFlashcardMode(true);
   };
   const leaveFlashcardMode = () => {
     setRevealed(false);
+    setReviewLaterIds(new Set());
+    setSessionComplete(false);
     setFlashcardMode(false);
   };
   const nextFlashcard = () => {
     setRevealed(false);
-    setFlashcardIndex((current) => (current + 1) % words.length);
+    setFlashcardIndex((current) => (current + 1) % sessionWords.length);
   };
   const previousFlashcard = () => {
     setRevealed(false);
-    setFlashcardIndex((current) => (current - 1 + words.length) % words.length);
+    setFlashcardIndex((current) => (current - 1 + sessionWords.length) % sessionWords.length);
   };
   const shuffleFlashcards = () => {
     setRevealed(false);
-    setFlashcardIndex(Math.floor(Math.random() * words.length));
+    setFlashcardIndex(Math.floor(Math.random() * sessionWords.length));
+  };
+  const completeCard = (result: 'got-it' | 'review-later') => {
+    if (!currentWord || sessionComplete) return;
+
+    const nextReviewLaterIds = new Set(reviewLaterIds);
+    if (result === 'got-it') {
+      nextReviewLaterIds.delete(currentWord.id);
+      onMarkReviewed(currentWord.id);
+    } else {
+      nextReviewLaterIds.add(currentWord.id);
+    }
+
+    setReviewLaterIds(nextReviewLaterIds);
+    setRevealed(false);
+
+    if (flashcardIndex < sessionWords.length - 1) {
+      setFlashcardIndex((current) => current + 1);
+      return;
+    }
+
+    const nextRoundIds = sessionWords.filter((word) => nextReviewLaterIds.has(word.id)).map((word) => word.id);
+    if (nextRoundIds.length > 0) {
+      setSessionWordIds(nextRoundIds);
+      setFlashcardIndex(0);
+      setSessionRound((current) => current + 1);
+    } else {
+      setSessionComplete(true);
+    }
   };
   return (
     <section className="animate-rise" data-testid="section-all-days-detail">
@@ -888,9 +946,18 @@ function AllDaysDetail({ dayNumber, words, reviewed, onBack, onMarkReviewed, onS
              <button type="button" data-testid="button-flashcard-back-to-list" onClick={leaveFlashcardMode} className="inline-flex items-center gap-2 rounded-full border border-[#d6d1c6] bg-[#fbf8f1] px-3.5 py-2 text-xs font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]">
                <ArrowLeft size={14} /> {t.returnToDayList}
              </button>
-             <span className="font-mono-custom text-[10px] uppercase tracking-[.16em] text-[#858982]">{t.wordsCount(words.length)}</span>
+              <div className="flex flex-wrap items-center justify-end gap-2 font-mono-custom text-[10px] uppercase tracking-[.16em] text-[#858982]">
+                <span data-testid="text-day-flashcard-round">{sessionComplete ? t.dailySessionComplete : sessionRound === 1 ? t.wordsCount(sessionWords.length) : t.reviewRound(sessionRound)}</span>
+                {!sessionComplete && reviewLaterIds.size > 0 && <span className="rounded-full bg-[#f7d8cd] px-2.5 py-1 text-[#a04b39]" data-testid="text-review-later-count">{t.wordsToReview(reviewLaterIds.size)}</span>}
+              </div>
            </div>
-           {currentWord && (
+            {sessionComplete ? (
+              <div className="rounded-[26px] border border-[#c9e2dc] bg-[#edf7f3] px-6 py-16 text-center shadow-[0_14px_34px_rgba(31,41,55,.06)]" data-testid="panel-day-flashcard-complete">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#24635f] text-[#f9f5e9]"><Check size={27} /></div>
+                <h2 className="mt-5 font-display text-3xl tracking-[-.04em] text-[#202a40]">{t.dailySessionComplete}</h2>
+                <p className="mt-2 text-sm text-[#5f675f]">{language === 'ar' ? 'أحسنت! تعلّمت كل كلمات هذا اليوم.' : 'Well done! You learned every word in this day’s set.'}</p>
+              </div>
+            ) : currentWord && (
              <>
                <Flashcard
                  word={currentWord}
@@ -904,6 +971,10 @@ function AllDaysDetail({ dayNumber, words, reviewed, onBack, onMarkReviewed, onS
                  isReviewed={reviewed.has(currentWord.id)}
                  onMarkReviewed={() => onMarkReviewed(currentWord.id)}
                  onSaveWord={onSaveWord}
+                  sessionActions={{
+                    onGotIt: () => completeCard('got-it'),
+                    onReviewLater: () => completeCard('review-later'),
+                  }}
                />
                <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-[#9a9e94]" data-testid="text-day-flashcard-keyboard-hint">
                  <span className="rounded border border-[#d8d2c6] bg-[#fbf8f1] px-1.5 py-0.5 font-mono-custom text-[10px]">space</span> {t.keyboardHint} <span className="mx-1 text-[#c5c0b5]">·</span> <span className="rounded border border-[#d8d2c6] bg-[#fbf8f1] px-1.5 py-0.5 font-mono-custom text-[10px]">← →</span> {t.keyboardMove}
