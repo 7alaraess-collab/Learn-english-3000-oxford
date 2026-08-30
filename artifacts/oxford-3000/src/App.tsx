@@ -1128,7 +1128,7 @@ function PronunciationButtons({ text, label, testIdPrefix, disabled = false }: {
   );
 }
 
-function StarButton({ isStarred, onToggle, testId }: { isStarred: boolean; onToggle: () => void; testId: string }) {
+function StarButton({ isStarred, onToggle, testId, disabled = false }: { isStarred: boolean; onToggle: () => void; testId: string; disabled?: boolean }) {
   const { t } = useLanguage();
   return (
     <button
@@ -1137,8 +1137,9 @@ function StarButton({ isStarred, onToggle, testId }: { isStarred: boolean; onTog
       aria-label={isStarred ? t.unstarWord : t.starWord}
       aria-pressed={isStarred}
       title={isStarred ? t.unstarWord : t.starWord}
+      disabled={disabled}
       onClick={(event) => { event.stopPropagation(); onToggle(); }}
-      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-all ${isStarred ? 'border-[#e6c94d] bg-[#f8e7ba] text-[#a17818] hover:bg-[#f3d24f]' : 'border-[#d6d1c6] bg-[#f6f2e9] text-[#969b91] hover:border-[#e6c94d] hover:bg-[#f8e7ba] hover:text-[#a17818]'}`}
+      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-all disabled:pointer-events-none disabled:opacity-50 ${isStarred ? 'border-[#e6c94d] bg-[#f8e7ba] text-[#a17818] hover:bg-[#f3d24f]' : 'border-[#d6d1c6] bg-[#f6f2e9] text-[#969b91] hover:border-[#e6c94d] hover:bg-[#f8e7ba] hover:text-[#a17818]'}`}
     >
       <Star size={16} fill={isStarred ? 'currentColor' : 'none'} strokeWidth={isStarred ? 2.2 : 1.8} />
     </button>
@@ -1186,13 +1187,35 @@ function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, cu
            <Shuffle size={14} className="transition-transform duration-300 group-hover:rotate-180" /> {t.shuffle}
         </button>
       </div>
-      <div className="relative overflow-hidden rounded-[26px] border border-[#d4cec0] bg-[#fbf8f1] shadow-[0_14px_34px_rgba(31,41,55,.08)]">
+       <div
+         className={`flashcard-scene ${revealed && !editing ? 'is-flipped' : ''}`}
+         data-testid="interactive-flashcard"
+         role="button"
+         tabIndex={0}
+         aria-pressed={revealed}
+         aria-label={t.tapToReveal}
+         onClick={(event) => {
+           if ((event.target as HTMLElement).closest('button')) return;
+           onReveal();
+         }}
+         onKeyDown={(event) => {
+           if ((event.target as HTMLElement).closest('button')) return;
+           if (event.code === 'Space' || event.key === 'Enter') {
+             event.preventDefault();
+             event.stopPropagation();
+             onReveal();
+           }
+         }}
+       >
+         <div className="flashcard-card">
+           <div className="flashcard-face flashcard-front">
+             <div className="flashcard-panel relative flex min-h-[560px] flex-col overflow-hidden rounded-[26px] border border-[#d4cec0] bg-[#fbf8f1] shadow-[0_14px_34px_rgba(31,41,55,.08)]">
         <div className="flex items-center justify-between border-b border-[#e4ded2] px-6 py-4 sm:px-9">
            <span className="font-mono-custom text-[10px] uppercase tracking-[0.16em] text-[#858982]">{t.card} {String(current + 1).padStart(2, '0')} <span className="text-[#c8c1b2]">/ {String(total).padStart(2, '0')}</span></span>
            <div className="flex items-center gap-2">
              <span className={`rounded-full px-2.5 py-1 font-mono-custom text-[10px] font-medium ${word.level === 'A1' ? 'bg-[#d9eee9] text-[#24635f]' : word.level === 'A2' ? 'bg-[#e5e9d2] text-[#5d6732]' : word.level === 'B1' ? 'bg-[#f8e7ba] text-[#7d5b19]' : 'bg-[#f7d8cd] text-[#a04b39]'}`}>{word.level}</span>
-              <StarButton isStarred={isStarred} onToggle={onToggleStar} testId={`button-star-word-${word.id}`} />
-              <button type="button" data-testid="button-edit-word" onClick={startEditing} className="inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] bg-[#f6f2e9] px-2.5 py-1.5 text-[11px] font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]"><Pencil size={12} /> {t.edit}</button>
+               <StarButton isStarred={isStarred} onToggle={onToggleStar} testId={`button-star-word-${word.id}`} disabled={revealed} />
+               <button type="button" data-testid="button-edit-word" disabled={revealed} onClick={startEditing} className="inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] bg-[#f6f2e9] px-2.5 py-1.5 text-[11px] font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f] disabled:pointer-events-none disabled:opacity-50"><Pencil size={12} /> {t.edit}</button>
            </div>
         </div>
           <div key={word.id} className="min-h-[340px] px-6 py-10 sm:min-h-[360px] sm:px-12 sm:py-12">
@@ -1213,28 +1236,9 @@ function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, cu
                </div>
              </div>
            ) : (
-             <div
-               className={`flashcard-scene ${revealed ? 'is-flipped' : ''}`}
-               data-testid="interactive-flashcard"
-               role="button"
-               tabIndex={0}
-               aria-pressed={revealed}
-               aria-label={t.tapToReveal}
-               onClick={(event) => {
-                 if ((event.target as HTMLElement).closest('button')) return;
-                 onReveal();
-               }}
-               onKeyDown={(event) => {
-                 if ((event.target as HTMLElement).closest('button')) return;
-                 if (event.code === 'Space' || event.key === 'Enter') {
-                   event.preventDefault();
-                   event.stopPropagation();
-                   onReveal();
-                 }
-               }}
-             >
-               <div className="flashcard-rotor">
-                  <div className="flashcard-face flashcard-front" aria-hidden={revealed}>
+              <div className="flashcard-body-content">
+                <div>
+                   <div className="flashcard-front-content" aria-hidden={revealed}>
           <div className="flex items-center gap-2 text-[#ef7657]">
             <span className="h-2 w-2 rounded-full bg-[#ef7657]" />
             <span className="font-mono-custom text-[10px] uppercase tracking-[0.17em]">{word.type}</span>
@@ -1245,43 +1249,70 @@ function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, cu
           </div>
            <button type="button" data-testid="button-reveal" disabled={revealed} onClick={(event) => { event.stopPropagation(); onReveal(); }} className="mt-9 flex items-center gap-2 border-b border-dashed border-[#9da398] pb-1 text-sm font-semibold text-[#5f675f] transition-colors hover:border-[#ef7657] hover:text-[#c14f39] disabled:pointer-events-none">{t.tapToReveal} <ArrowRight size={15} /></button>
                   </div>
-                  <div className="flashcard-face flashcard-back" aria-hidden={!revealed} data-testid="panel-answer">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 text-[#24635f]">
-                        <span className="h-2 w-2 rounded-full bg-[#24635f]" />
-                        <span className="font-mono-custom text-[10px] uppercase tracking-[0.17em]">{t.arabicTranslation}</span>
-                      </div>
-                      <PronunciationButtons text={word.word} label={language === 'ar' ? `كلمة ${word.word}` : `the word ${word.word}`} testIdPrefix="button-pronounce-word-back" disabled={!revealed} />
-                    </div>
-                    <div className="mt-7 border-b border-[#e4ded2] pb-6">
-                      <div className="font-arabic text-[clamp(2rem,5vw,3rem)] font-semibold leading-tight text-[#24635f]" dir="rtl" data-testid="text-translation">{word.translation}</div>
-                    </div>
-                    <div className="mt-5 grid gap-3 border-l-2 border-[#f3d24f] pl-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
-                      <div className="grid gap-2">
-                        <div className="font-mono-custom text-[9px] uppercase tracking-[0.14em] text-[#858982]">{t.exampleSentence}</div>
-                        <p className="text-[15px] leading-relaxed text-[#3d4651]" data-testid="text-example">“{word.example}”</p>
-                        <p className="font-arabic text-[13px] leading-relaxed text-[#858982]" dir="rtl" data-testid="text-example-translation">{word.exampleTranslation}</p>
-                      </div>
-                      <PronunciationButtons text={word.example} label={language === 'ar' ? 'جملة المثال' : t.exampleSentence} testIdPrefix="button-pronounce-example" disabled={!revealed} />
-                    </div>
-                  </div>
-                </div>
+              </div>
               </div>
            )}
         </div>
         <div className="flex items-center justify-between border-t border-[#e4ded2] px-5 py-4 sm:px-9">
-          <button type="button" data-testid="button-previous" onClick={onPrevious} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-[#737970] transition-colors hover:bg-[#eee8dc] hover:text-[#202a40]"><ArrowLeft size={15} /> {t.previous}</button>
+           <button type="button" data-testid="button-previous" disabled={revealed} onClick={onPrevious} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-[#737970] transition-colors hover:bg-[#eee8dc] hover:text-[#202a40] disabled:pointer-events-none disabled:opacity-50"><ArrowLeft size={15} /> {t.previous}</button>
            {sessionActions ? (
              <div className="flex flex-wrap items-center justify-center gap-2">
-               <button type="button" data-testid="button-got-it" onClick={sessionActions.onGotIt} className="inline-flex items-center gap-1.5 rounded-full bg-[#24635f] px-3.5 py-2 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#1c514e]"><Check size={14} /> {t.gotIt}</button>
-               <button type="button" data-testid="button-review-later" onClick={sessionActions.onReviewLater} className="inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] bg-[#f6f2e9] px-3.5 py-2 text-xs font-semibold text-[#5f675f] transition-colors hover:border-[#ef7657] hover:bg-[#fff4ef] hover:text-[#c14f39]"><RotateCcw size={13} /> {t.reviewLater}</button>
+                <button type="button" data-testid="button-got-it" disabled={revealed} onClick={sessionActions.onGotIt} className="inline-flex items-center gap-1.5 rounded-full bg-[#24635f] px-3.5 py-2 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#1c514e] disabled:pointer-events-none disabled:opacity-50"><Check size={14} /> {t.gotIt}</button>
+                <button type="button" data-testid="button-review-later" disabled={revealed} onClick={sessionActions.onReviewLater} className="inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] bg-[#f6f2e9] px-3.5 py-2 text-xs font-semibold text-[#5f675f] transition-colors hover:border-[#ef7657] hover:bg-[#fff4ef] hover:text-[#c14f39] disabled:pointer-events-none disabled:opacity-50"><RotateCcw size={13} /> {t.reviewLater}</button>
              </div>
            ) : (
-             <button type="button" data-testid="button-mark-known" onClick={onMarkReviewed} className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-all ${isReviewed ? 'bg-[#d9eee9] text-[#24635f]' : 'text-[#737970] hover:bg-[#f3d24f] hover:text-[#202a40]'}`}><Check size={14} /> {isReviewed ? t.inYourRhythm : t.iKnowThis}</button>
+              <button type="button" data-testid="button-mark-known" disabled={revealed} onClick={onMarkReviewed} className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-all disabled:pointer-events-none disabled:opacity-50 ${isReviewed ? 'bg-[#d9eee9] text-[#24635f]' : 'text-[#737970] hover:bg-[#f3d24f] hover:text-[#202a40]'}`}><Check size={14} /> {isReviewed ? t.inYourRhythm : t.iKnowThis}</button>
            )}
-          <button type="button" data-testid="button-next" onClick={onNext} className="flex items-center gap-2 rounded-lg bg-[#202a40] px-3.5 py-2.5 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852]">{t.nextWord} <ArrowRight size={15} /></button>
-        </div>
-      </div>
+           <button type="button" data-testid="button-next" disabled={revealed} onClick={onNext} className="flex items-center gap-2 rounded-lg bg-[#202a40] px-3.5 py-2.5 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852] disabled:pointer-events-none disabled:opacity-50">{t.nextWord} <ArrowRight size={15} /></button>
+         </div>
+       </div>
+     </div>
+   <div className="flashcard-face flashcard-back" aria-hidden={!revealed} data-testid="panel-answer">
+     <div className="flashcard-panel relative flex min-h-[560px] flex-col overflow-hidden rounded-[26px] border border-[#d4cec0] bg-[#fbf8f1] shadow-[0_14px_34px_rgba(31,41,55,.08)]">
+       <div className="flex items-center justify-between border-b border-[#e4ded2] px-6 py-4 sm:px-9">
+         <span className="font-mono-custom text-[10px] uppercase tracking-[0.16em] text-[#858982]">{t.card} {String(current + 1).padStart(2, '0')} <span className="text-[#c8c1b2]">/ {String(total).padStart(2, '0')}</span></span>
+         <div className="flex items-center gap-2">
+           <span className={`rounded-full px-2.5 py-1 font-mono-custom text-[10px] font-medium ${word.level === 'A1' ? 'bg-[#d9eee9] text-[#24635f]' : word.level === 'A2' ? 'bg-[#e5e9d2] text-[#5d6732]' : word.level === 'B1' ? 'bg-[#f8e7ba] text-[#7d5b19]' : 'bg-[#f7d8cd] text-[#a04b39]'}`}>{word.level}</span>
+           <StarButton isStarred={isStarred} onToggle={onToggleStar} testId={`button-star-word-back-${word.id}`} disabled={!revealed} />
+           <button type="button" data-testid="button-edit-word-back" disabled={!revealed} onClick={startEditing} className="inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] bg-[#f6f2e9] px-2.5 py-1.5 text-[11px] font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f] disabled:pointer-events-none disabled:opacity-50"><Pencil size={12} /> {t.edit}</button>
+         </div>
+       </div>
+       <div className="min-h-[340px] flex-1 px-6 py-10 sm:px-12 sm:py-12">
+         <div className="flex items-center justify-between gap-3">
+           <div className="flex items-center gap-2 text-[#24635f]">
+             <span className="h-2 w-2 rounded-full bg-[#24635f]" />
+             <span className="font-mono-custom text-[10px] uppercase tracking-[0.17em]">{t.arabicTranslation}</span>
+           </div>
+           <PronunciationButtons text={word.word} label={language === 'ar' ? `كلمة ${word.word}` : `the word ${word.word}`} testIdPrefix="button-pronounce-word-back" disabled={!revealed} />
+         </div>
+         <div className="mt-7 border-b border-[#e4ded2] pb-6">
+           <div className="font-arabic text-[clamp(2rem,5vw,3rem)] font-semibold leading-tight text-[#24635f]" dir="rtl" data-testid="text-translation">{word.translation}</div>
+         </div>
+         <div className="mt-5 grid gap-3 border-l-2 border-[#f3d24f] pl-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+           <div className="grid gap-2">
+             <div className="font-mono-custom text-[9px] uppercase tracking-[0.14em] text-[#858982]">{t.exampleSentence}</div>
+             <p className="text-[15px] leading-relaxed text-[#3d4651]" data-testid="text-example">“{word.example}”</p>
+             <p className="font-arabic text-[13px] leading-relaxed text-[#858982]" dir="rtl" data-testid="text-example-translation">{word.exampleTranslation}</p>
+           </div>
+           <PronunciationButtons text={word.example} label={language === 'ar' ? 'جملة المثال' : t.exampleSentence} testIdPrefix="button-pronounce-example" disabled={!revealed} />
+         </div>
+       </div>
+       <div className="flex items-center justify-between border-t border-[#e4ded2] px-5 py-4 sm:px-9">
+         <button type="button" data-testid="button-previous-back" disabled={!revealed} onClick={onPrevious} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-[#737970] transition-colors hover:bg-[#eee8dc] hover:text-[#202a40] disabled:pointer-events-none disabled:opacity-50"><ArrowLeft size={15} /> {t.previous}</button>
+         {sessionActions ? (
+           <div className="flex flex-wrap items-center justify-center gap-2">
+             <button type="button" data-testid="button-got-it-back" disabled={!revealed} onClick={sessionActions.onGotIt} className="inline-flex items-center gap-1.5 rounded-full bg-[#24635f] px-3.5 py-2 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#1c514e] disabled:pointer-events-none disabled:opacity-50"><Check size={14} /> {t.gotIt}</button>
+             <button type="button" data-testid="button-review-later-back" disabled={!revealed} onClick={sessionActions.onReviewLater} className="inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] bg-[#f6f2e9] px-3.5 py-2 text-xs font-semibold text-[#5f675f] transition-colors hover:border-[#ef7657] hover:bg-[#fff4ef] hover:text-[#c14f39] disabled:pointer-events-none disabled:opacity-50"><RotateCcw size={13} /> {t.reviewLater}</button>
+           </div>
+         ) : (
+           <button type="button" data-testid="button-mark-known-back" disabled={!revealed} onClick={onMarkReviewed} className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-all disabled:pointer-events-none disabled:opacity-50 ${isReviewed ? 'bg-[#d9eee9] text-[#24635f]' : 'text-[#737970] hover:bg-[#f3d24f] hover:text-[#202a40]'}`}><Check size={14} /> {isReviewed ? t.inYourRhythm : t.iKnowThis}</button>
+         )}
+         <button type="button" data-testid="button-next-back" disabled={!revealed} onClick={onNext} className="flex items-center gap-2 rounded-lg bg-[#202a40] px-3.5 py-2.5 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852] disabled:pointer-events-none disabled:opacity-50">{t.nextWord} <ArrowRight size={15} /></button>
+       </div>
+     </div>
+   </div>
+ </div>
+ </div>
     </section>
   );
 }
