@@ -108,7 +108,8 @@ const translations = {
     dailyRhythm: 'Daily rhythm',
     dailyRhythmComplete: 'Daily rhythm complete. Beautiful work.',
     dailyWordsLeft: (count: number) => `${count} ${count === 1 ? 'word' : 'words'} left in today’s rhythm.`,
-    resetSession: 'Reset session',
+    resetAllData: 'Start over',
+    resetAllDataConfirmation: 'Are you sure you want to delete all progress and start over?',
     builtForLongGame: 'Built for the long game',
     study: 'Study',
     browse: 'Browse',
@@ -246,7 +247,8 @@ const translations = {
     dailyRhythm: 'إيقاعك اليومي',
     dailyRhythmComplete: 'اكتمل إيقاعك اليومي. عمل رائع.',
     dailyWordsLeft: (count: number) => `${count} ${count === 1 ? 'كلمة متبقية' : 'كلمات متبقية'} في إيقاع اليوم.`,
-    resetSession: 'إعادة ضبط الجلسة',
+    resetAllData: 'البدء من جديد',
+    resetAllDataConfirmation: 'هل أنت متأكد من رغبتك في حذف كل التقدم والبدء من جديد؟',
     builtForLongGame: 'مصمم للتعلّم المستمر',
     study: 'دراسة',
     browse: 'تصفّح',
@@ -823,8 +825,8 @@ function Sidebar({ view, setView, mobileOpen, closeMobile, onReset, reviewedToda
              <div className="h-full rounded-full bg-[#ef7657] transition-all duration-500" style={{ width: `${Math.min(100, (reviewedToday / dailyGoal) * 100)}%` }} />
           </div>
             <p className="mt-3 text-xs leading-relaxed text-[#aab3bd]">{reviewedToday >= dailyGoal ? t.dailyRhythmComplete : t.dailyWordsLeft(dailyGoal - reviewedToday)}</p>
-          <button type="button" data-testid="button-reset-session" onClick={onReset} className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#dce1dc] transition-colors hover:text-[#f3d24f]">
-             <RotateCcw size={12} /> {t.resetSession}
+           <button type="button" data-testid="button-reset-all-data" onClick={onReset} className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#dce1dc] transition-colors hover:text-[#f3d24f]">
+              <RotateCcw size={12} /> {t.resetAllData}
           </button>
         </div>
          <div className="mt-5 flex items-center gap-2 px-2 text-[11px] text-[#84909f]"><Command size={12} /> <span>{t.builtForLongGame}</span></div>
@@ -1453,6 +1455,7 @@ function Home() {
   const [wordOverrides, setWordOverrides] = useState<Record<string, WordOverrides>>(readWordOverrides);
   const authUserRef = useRef<string | null | undefined>(undefined);
   const hydratedUserRef = useRef<string | null>(null);
+  const resetProgressUserRef = useRef<string | null>(null);
   useEffect(() => {
     if (!mobileOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1478,6 +1481,7 @@ function Home() {
 
     authUserRef.current = userId;
     hydratedUserRef.current = null;
+    resetProgressUserRef.current = null;
     lastQueuedProgressRef.current = null;
     if (userId) {
       const mergedReviewed = new Set([...readReviewedIds(userId), ...readReviewedIds()]);
@@ -1511,18 +1515,22 @@ function Home() {
   useEffect(() => {
     if (!authLoaded || !isSignedIn || !user?.id || progressQuery.isLoading || !progressQuery.data || hydratedUserRef.current === user.id) return;
 
-    const serverReviewed = new Set(progressQuery.data.completedWordIds.filter((id) => sourceWords.some((word) => word.id === id)));
-    const mergedReviewDates = { ...(progressQuery.data.reviewDates ?? {}), ...reviewDates };
-    const mergedReviewed = new Set([...reviewed, ...serverReviewed]);
+    const resettingProgress = resetProgressUserRef.current === user.id;
+    const serverReviewed = resettingProgress
+      ? new Set<number>()
+      : new Set(progressQuery.data.completedWordIds.filter((id) => sourceWords.some((word) => word.id === id)));
+    const mergedReviewDates = resettingProgress ? {} : { ...(progressQuery.data.reviewDates ?? {}), ...reviewDates };
+    const mergedReviewed = resettingProgress ? new Set<number>() : new Set([...reviewed, ...serverReviewed]);
     const mergedCompletedDays = new Set([
-      ...progressQuery.data.completedDayNumbers,
-      ...readCompletedDayNumbers(user.id),
-      ...getCompletedDayNumbers(days, mergedReviewed),
+      ...(resettingProgress ? [] : progressQuery.data.completedDayNumbers),
+      ...(resettingProgress ? [] : readCompletedDayNumbers(user.id)),
+      ...(resettingProgress ? [] : getCompletedDayNumbers(days, mergedReviewed)),
     ]);
     setReviewed(mergedReviewed);
     setReviewDates(mergedReviewDates);
     setCompletedDays(mergedCompletedDays);
     hydratedUserRef.current = user.id;
+    resetProgressUserRef.current = null;
   }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, days, reviewDates]);
 
   useEffect(() => {
@@ -1582,18 +1590,32 @@ function Home() {
       return next;
     });
   };
-  const resetSession = () => {
+  const resetAllData = () => {
+    if (!window.confirm(t.resetAllDataConfirmation)) return;
+
+    const userId = isSignedIn ? user?.id : undefined;
+    const emptyProgress: ProgressInput = {
+      completedWordIds: [],
+      completedDayNumbers: [],
+      reviewDates: {},
+    };
     setReviewed(new Set());
     setReviewDates({});
     setCompletedDays(new Set());
-    const userId = isSignedIn ? user?.id : undefined;
-    window.localStorage.removeItem(getStorageKey(reviewedStorageKey, userId));
-    window.localStorage.removeItem(getStorageKey(reviewDatesStorageKey, userId));
-    window.localStorage.removeItem(getStorageKey(completedDaysStorageKey, userId));
+    for (const key of [reviewedStorageKey, reviewDatesStorageKey, completedDaysStorageKey]) {
+      window.localStorage.removeItem(getStorageKey(key, userId));
+      window.localStorage.removeItem(getStorageKey(key));
+    }
+    if (userId) {
+      resetProgressUserRef.current = userId;
+      lastQueuedProgressRef.current = JSON.stringify(emptyProgress);
+      queryClient.setQueryData(getGetProgressQueryKey(), emptyProgress);
+      queueProgressSave(emptyProgress);
+    }
   };
   return (
      <div className="app-shell paper-grain min-h-[100dvh] bg-[#f6f2e9]">
-      <Sidebar view={view} setView={navigate} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} onReset={resetSession} reviewedToday={reviewedToday} />
+       <Sidebar view={view} setView={navigate} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} onReset={resetAllData} reviewedToday={reviewedToday} />
       <TopBar view={view} setView={navigate} openMenu={() => setMobileOpen(true)} mobileOpen={mobileOpen} />
        <main className="app-main ml-0 px-5 pb-16 pt-9 md:ml-[264px] md:px-10 md:pt-12">
         <div className="mx-auto max-w-[1250px]">
