@@ -243,8 +243,8 @@ const translations = {
     reviewDeskLabel: 'The recall desk',
     reviewThreeDay: '3-day review',
     reviewSixDay: '6-day review',
-    reviewThreeDayDescription: 'A fresh mix from your last three completed days.',
-    reviewSixDayDescription: 'A wider checkpoint across your last six completed days.',
+    reviewThreeDayDescription: '12 words total — 4 randomly selected from each of your last three completed days.',
+    reviewSixDayDescription: '20 words total — balanced across all six of your last completed days.',
     reviewDaysReady: (count: number) => `${count} ${count === 1 ? 'day' : 'days'} completed`,
     reviewWordsReady: (count: number) => `${count} ${count === 1 ? 'word' : 'words'} in the mix`,
     reviewNeedDays: (count: number) => `Complete ${count} ${count === 1 ? 'day' : 'days'} to open this review.`,
@@ -407,8 +407,8 @@ const translations = {
     reviewDeskLabel: 'مكتب الاستدعاء',
     reviewThreeDay: 'مراجعة 3 أيام',
     reviewSixDay: 'مراجعة 6 أيام',
-    reviewThreeDayDescription: 'مزيج جديد من آخر ثلاثة أيام مكتملة.',
-    reviewSixDayDescription: 'محطة أوسع عبر آخر ستة أيام مكتملة.',
+    reviewThreeDayDescription: '12 كلمة — 4 كلمات مختارة عشوائيًا من كل يوم من آخر ثلاثة أيام مكتملة.',
+    reviewSixDayDescription: '20 كلمة — موزعة بتوازن على آخر ستة أيام مكتملة.',
     reviewDaysReady: (count: number) => `${count} ${count === 1 ? 'يوم مكتمل' : 'أيام مكتملة'}`,
     reviewWordsReady: (count: number) => `${count} ${count === 1 ? 'كلمة في المزيج' : 'كلمات في المزيج'}`,
     reviewNeedDays: (count: number) => `أكمل ${count === 1 ? 'يومًا' : `${count} أيام`} لفتح هذه المراجعة.`,
@@ -487,13 +487,17 @@ function displayPartOfSpeech(value: string, language: Language) {
 
 const sourceWords: EditableWord[] = oxford3000.map((word) => ({ ...word }));
 const wordsPerDay = 12;
+const curriculumDays = 250;
+const threeDayReviewWordCount = 12;
+const sixDayReviewWordCount = 20;
 
 function splitIntoDays(words: EditableWord[]) {
-  const days: EditableWord[][] = [];
-  for (let start = 0; start < words.length; start += wordsPerDay) {
-    days.push(words.slice(start, start + wordsPerDay));
+  if (words.length !== curriculumDays * wordsPerDay) {
+    throw new Error(`Oxford 3000 curriculum must contain exactly ${curriculumDays * wordsPerDay} words.`);
   }
-  return days;
+  return Array.from({ length: curriculumDays }, (_, dayIndex) =>
+    words.slice(dayIndex * wordsPerDay, (dayIndex + 1) * wordsPerDay),
+  );
 }
 
 function shuffleItems<T>(items: T[]) {
@@ -772,7 +776,7 @@ function readReviewMilestones(userId?: string) {
   try {
     const saved = JSON.parse(window.localStorage.getItem(getStorageKey(reviewMilestonesStorageKey, userId)) ?? '{}') as unknown;
     if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {};
-    return Object.fromEntries(Object.entries(saved).filter(([, date]) => typeof date === 'string')) as Record<string, string>;
+    return normalizeReviewMilestones(Object.fromEntries(Object.entries(saved).filter(([, date]) => typeof date === 'string')) as Record<string, string>);
   } catch {
     return {};
   }
@@ -846,6 +850,17 @@ function getContiguousCompletedDayCount(completedDays: Set<number>, totalDays: n
 
 function getMilestoneKey(dayCount: 3 | 6, boundaryDay: number) {
   return `review-${dayCount}-day-${boundaryDay}`;
+}
+
+function normalizeReviewMilestones(milestones: Record<string, string>) {
+  const normalized = { ...milestones };
+  if (milestones['review-3-day'] && !normalized[getMilestoneKey(3, 3)]) {
+    normalized[getMilestoneKey(3, 3)] = milestones['review-3-day'];
+  }
+  if (milestones['review-6-day'] && !normalized[getMilestoneKey(6, 6)]) {
+    normalized[getMilestoneKey(6, 6)] = milestones['review-6-day'];
+  }
+  return normalized;
 }
 
 function getReviewBoundary(dayCount: 3 | 6, completedThrough: number) {
@@ -1275,13 +1290,50 @@ function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, markReviewe
   );
 }
 
-function getRecentReviewWords(days: EditableWord[][], completedDays: Set<number>, dayCount: number) {
+function reviewWordSignature(words: EditableWord[]) {
+  return words.map((word) => word.id).sort((a, b) => a - b).join(',');
+}
+
+function getRecentReviewWords(days: EditableWord[][], completedDays: Set<number>, dayCount: number, avoidSignature?: string) {
   const completedThrough = getContiguousCompletedDayCount(completedDays, days.length);
   const recentDayNumbers = Array.from(
     { length: Math.min(dayCount, completedThrough) },
     (_, index) => completedThrough - index,
   );
-  return shuffleItems(recentDayNumbers.flatMap((dayNumber) => days[dayNumber - 1] ?? []));
+  const recentDaySets = recentDayNumbers.map((dayNumber) => days[dayNumber - 1] ?? []);
+  const targetCount = dayCount === 3 ? threeDayReviewWordCount : sixDayReviewWordCount;
+  const wordsPerSet = Math.floor(targetCount / recentDaySets.length);
+  const extraWordCount = targetCount % recentDaySets.length;
+  const buildMix = () => {
+    const extraWordSetIndexes = new Set(shuffleItems(recentDaySets.map((_, index) => index)).slice(0, extraWordCount));
+    return recentDaySets.map((dayWords, setIndex) => {
+      const countForSet = wordsPerSet + (extraWordSetIndexes.has(setIndex) ? 1 : 0);
+      return shuffleItems(dayWords).slice(0, countForSet);
+    });
+  };
+
+  let selectedByDay = buildMix();
+  let words = shuffleItems(selectedByDay.flat());
+  let attempts = 0;
+  while (avoidSignature && reviewWordSignature(words) === avoidSignature && attempts < 8) {
+    selectedByDay = buildMix();
+    words = shuffleItems(selectedByDay.flat());
+    attempts += 1;
+  }
+  if (avoidSignature && reviewWordSignature(words) === avoidSignature) {
+    const selectedIds = new Set(words.map((word) => word.id));
+    const replacementSetIndex = selectedByDay.findIndex((selected, setIndex) =>
+      selected.length > 0 && recentDaySets[setIndex].some((word) => !selectedIds.has(word.id)),
+    );
+    if (replacementSetIndex >= 0) {
+      const replacement = shuffleItems(recentDaySets[replacementSetIndex]).find((word) => !selectedIds.has(word.id));
+      if (replacement) {
+        const replacedId = selectedByDay[replacementSetIndex][0].id;
+        words = shuffleItems(words.map((word) => word.id === replacedId ? replacement : word));
+      }
+    }
+  }
+  return words;
 }
 
 function ReviewMilestoneCard({ milestoneKey, dayCount, words, completed, onStart }: { milestoneKey: string; dayCount: number; words: EditableWord[]; completed: boolean; onStart: () => void }) {
@@ -1406,11 +1458,17 @@ function ReviewSession({ milestoneKey, dayCount, words, reviewed, onMarkReviewed
 function ReviewView({ days, completedDays, reviewMilestones, reviewed, onMarkReviewed, onSaveWord, onCompleteReview }: { days: EditableWord[][]; completedDays: Set<number>; reviewMilestones: Record<string, string>; reviewed: Set<number>; onMarkReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void; onCompleteReview: (key: string) => void }) {
   const { language, t } = useLanguage();
   const [activeSession, setActiveSession] = useState<{ key: string; dayCount: number; words: EditableWord[] } | null>(null);
+  const previousMixSignaturesRef = useRef<Record<number, string>>({});
   const completedDayCount = getContiguousCompletedDayCount(completedDays, days.length);
   const threeDayBoundary = getReviewBoundary(3, completedDayCount);
   const sixDayBoundary = getReviewBoundary(6, completedDayCount);
+  const getFreshReviewWords = (dayCount: number) => {
+    const words = getRecentReviewWords(days, completedDays, dayCount, previousMixSignaturesRef.current[dayCount]);
+    previousMixSignaturesRef.current[dayCount] = reviewWordSignature(words);
+    return words;
+  };
   const startReview = (dayCount: number) => {
-    const words = getRecentReviewWords(days, completedDays, dayCount);
+    const words = getFreshReviewWords(dayCount);
     if (words.length === 0) return;
     const pendingMilestone = getPendingMilestone(completedDays, reviewMilestones, days.length);
     const boundaryDay = pendingMilestone?.dayCount === dayCount
@@ -1422,8 +1480,8 @@ function ReviewView({ days, completedDays, reviewMilestones, reviewed, onMarkRev
   if (activeSession) {
     return <ReviewSession milestoneKey={activeSession.key} dayCount={activeSession.dayCount} words={activeSession.words} reviewed={reviewed} onMarkReviewed={onMarkReviewed} onSaveWord={onSaveWord} onComplete={onCompleteReview} onBack={() => setActiveSession(null)} />;
   }
-  const threeDayWords = completedDayCount >= 3 ? getRecentReviewWords(days, completedDays, 3) : [];
-  const sixDayWords = completedDayCount >= 6 ? getRecentReviewWords(days, completedDays, 6) : [];
+  const threeDayWords = completedDayCount >= 3 ? getFreshReviewWords(3) : [];
+  const sixDayWords = completedDayCount >= 6 ? getFreshReviewWords(6) : [];
   return (
     <section className="animate-rise" data-testid="section-review">
       <div className="relative overflow-hidden rounded-[28px] border border-[#d4cec0] bg-[#fbf8f1] px-6 py-8 shadow-[0_10px_28px_rgba(31,41,55,.04)] sm:px-10 sm:py-10">
@@ -1788,7 +1846,7 @@ function Home() {
     if (userId) {
       const mergedReviewed = new Set([...readReviewedIds(userId), ...readReviewedIds()]);
       const mergedReviewDates = { ...readReviewDates(userId), ...readReviewDates() };
-      const mergedReviewMilestones = { ...readReviewMilestones(userId), ...readReviewMilestones() };
+      const mergedReviewMilestones = normalizeReviewMilestones({ ...readReviewMilestones(userId), ...readReviewMilestones() });
       const mergedCompletedDays = new Set([
         ...readCompletedDayNumbers(userId),
         ...readCompletedDayNumbers(),
@@ -1827,7 +1885,7 @@ function Home() {
       ? new Set<number>()
       : new Set(progressQuery.data.completedWordIds.filter((id) => sourceWords.some((word) => word.id === id)));
     const mergedReviewDates = resettingProgress ? {} : { ...(progressQuery.data.reviewDates ?? {}), ...reviewDates };
-    const mergedReviewMilestones = resettingProgress ? {} : { ...(progressQuery.data.reviewMilestones ?? {}), ...reviewMilestones };
+    const mergedReviewMilestones = resettingProgress ? {} : normalizeReviewMilestones({ ...(progressQuery.data.reviewMilestones ?? {}), ...reviewMilestones });
     const mergedReviewed = resettingProgress ? new Set<number>() : new Set([...reviewed, ...serverReviewed]);
     const mergedCompletedDays = new Set([
       ...(resettingProgress ? [] : progressQuery.data.completedDayNumbers),
