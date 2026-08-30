@@ -23,10 +23,12 @@ function requireUser(req: Request, res: Response, next: NextFunction) {
 function serializeProgress(progress: {
   completedWordIds: number[];
   completedDayNumbers: number[];
+  reviewDates: Record<string, string>;
 }) {
   return {
     completedWordIds: progress.completedWordIds,
     completedDayNumbers: progress.completedDayNumbers,
+    reviewDates: progress.reviewDates,
   };
 }
 
@@ -36,7 +38,7 @@ router.get("/progress", requireUser, async (_req, res): Promise<void> => {
   });
 
   res.json(GetProgressResponse.parse(
-    serializeProgress(progress ?? { completedWordIds: [], completedDayNumbers: [] }),
+    serializeProgress(progress ?? { completedWordIds: [], completedDayNumbers: [], reviewDates: {} }),
   ));
 });
 
@@ -56,18 +58,21 @@ router.put("/progress", requireUser, async (req, res): Promise<void> => {
       userId: res.locals.userId,
       completedWordIds: parsed.data.completedWordIds,
       completedDayNumbers: parsed.data.completedDayNumbers,
+      reviewDates: parsed.data.reviewDates,
     })
     .onConflictDoUpdate({
       target: userProgressTable.userId,
       set: {
         completedWordIds: parsed.data.completedWordIds,
         completedDayNumbers: parsed.data.completedDayNumbers,
+        reviewDates: parsed.data.reviewDates,
         updatedAt: new Date(),
       },
     })
     .returning({
       completedWordIds: userProgressTable.completedWordIds,
       completedDayNumbers: userProgressTable.completedDayNumbers,
+      reviewDates: userProgressTable.reviewDates,
     });
 
   res.json(SaveProgressResponse.parse(serializeProgress(progress)));

@@ -28,7 +28,8 @@ export const getProgressResponseCompletedDayNumbersItemMax = 300;
 
 export const GetProgressResponse = zod.object({
   "completedWordIds": zod.array(zod.number().int().min(1).max(getProgressResponseCompletedWordIdsItemMax)),
-  "completedDayNumbers": zod.array(zod.number().int().min(1).max(getProgressResponseCompletedDayNumbersItemMax))
+  "completedDayNumbers": zod.array(zod.number().int().min(1).max(getProgressResponseCompletedDayNumbersItemMax)),
+  "reviewDates": zod.record(zod.string(), zod.string())
 })
 
 
@@ -47,7 +48,8 @@ export const saveProgressBodyCompletedDayNumbersMax = 300;
 
 export const SaveProgressBody = zod.object({
   "completedWordIds": zod.array(zod.number().int().min(1).max(saveProgressBodyCompletedWordIdsItemMax)).max(saveProgressBodyCompletedWordIdsMax),
-  "completedDayNumbers": zod.array(zod.number().int().min(1).max(saveProgressBodyCompletedDayNumbersItemMax)).max(saveProgressBodyCompletedDayNumbersMax)
+  "completedDayNumbers": zod.array(zod.number().int().min(1).max(saveProgressBodyCompletedDayNumbersItemMax)).max(saveProgressBodyCompletedDayNumbersMax),
+  "reviewDates": zod.record(zod.string(), zod.string())
 })
 
 export const saveProgressResponseCompletedWordIdsItemMax = 3000;
@@ -58,7 +60,8 @@ export const saveProgressResponseCompletedDayNumbersItemMax = 300;
 
 export const SaveProgressResponse = zod.object({
   "completedWordIds": zod.array(zod.number().int().min(1).max(saveProgressResponseCompletedWordIdsItemMax)),
-  "completedDayNumbers": zod.array(zod.number().int().min(1).max(saveProgressResponseCompletedDayNumbersItemMax))
+  "completedDayNumbers": zod.array(zod.number().int().min(1).max(saveProgressResponseCompletedDayNumbersItemMax)),
+  "reviewDates": zod.record(zod.string(), zod.string())
 })
 
 

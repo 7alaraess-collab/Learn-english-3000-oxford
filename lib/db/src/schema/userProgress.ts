@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 export const userProgressTable = pgTable("user_progress", {
   userId: text("user_id").primaryKey(),
@@ -11,6 +11,10 @@ export const userProgressTable = pgTable("user_progress", {
     .array()
     .notNull()
     .default(sql`ARRAY[]::integer[]`),
+  reviewDates: jsonb("review_dates")
+    .$type<Record<string, string>>()
+    .notNull()
+    .default(sql`'{}'::jsonb`),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

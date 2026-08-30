@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
 import { arSA } from '@clerk/localizations';
@@ -127,10 +127,7 @@ const translations = {
     inThisView: 'In this view',
     matchingFilters: 'matching your filters',
     dailyWordsSession: "words in today's session",
-    nextMilestone: 'Next milestone',
     complete: 'Complete',
-    oxfordFinished: 'Oxford 3000 finished',
-    wordsToGo: 'words to go',
     learningDesk: 'Your learning desk',
     betterEnglish: 'better English.',
     everyWordHasAPlace: 'Every word has a',
@@ -268,10 +265,7 @@ const translations = {
     inThisView: 'في هذا العرض',
     matchingFilters: 'كلمة مطابقة للتصفية',
     dailyWordsSession: 'كلمة في جلسة اليوم',
-    nextMilestone: 'المحطة القادمة',
     complete: 'مكتمل',
-    oxfordFinished: 'اكتملت قائمة أكسفورد 3000',
-    wordsToGo: 'كلمة متبقية',
     learningDesk: 'مساحتك التعليمية',
     betterEnglish: 'إنجليزية أفضل.',
     everyWordHasAPlace: 'لكل كلمة',
@@ -1415,6 +1409,14 @@ function Home() {
       },
     },
   });
+  const progressSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const lastQueuedProgressRef = useRef<string | null>(null);
+  const queueProgressSave = useCallback((payload: ProgressInput) => {
+    progressSaveQueueRef.current = progressSaveQueueRef.current
+      .catch(() => undefined)
+      .then(() => saveProgressMutation.mutateAsync({ data: payload }))
+      .catch(() => undefined);
+  }, [saveProgressMutation]);
   const [view, setView] = useState<AppView>('study');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -1453,6 +1455,7 @@ function Home() {
 
     authUserRef.current = userId;
     hydratedUserRef.current = null;
+    lastQueuedProgressRef.current = null;
     if (userId) {
       const mergedReviewed = new Set([...readReviewedIds(userId), ...readReviewedIds()]);
       const mergedReviewDates = { ...readReviewDates(userId), ...readReviewDates() };
@@ -1475,27 +1478,41 @@ function Home() {
     if (!authLoaded || !isSignedIn || !user?.id || progressQuery.isLoading || !progressQuery.data || hydratedUserRef.current === user.id) return;
 
     const serverReviewed = new Set(progressQuery.data.completedWordIds.filter((id) => sourceWords.some((word) => word.id === id)));
+    const mergedReviewDates = { ...(progressQuery.data.reviewDates ?? {}), ...reviewDates };
     const mergedReviewed = new Set([...reviewed, ...serverReviewed]);
     const mergedCompletedDays = new Set([
       ...progressQuery.data.completedDayNumbers,
       ...getCompletedDayNumbers(days, mergedReviewed),
     ]);
-    const payload: ProgressInput = {
-      completedWordIds: [...mergedReviewed].sort((a, b) => a - b),
-      completedDayNumbers: [...mergedCompletedDays].sort((a, b) => a - b),
-    };
     setReviewed(mergedReviewed);
+    setReviewDates(mergedReviewDates);
     setCompletedDays(mergedCompletedDays);
-    window.localStorage.setItem(getStorageKey(reviewedStorageKey, user.id), JSON.stringify(payload.completedWordIds));
-    window.localStorage.setItem(getStorageKey(reviewDatesStorageKey, user.id), JSON.stringify(reviewDates));
-    if (
-      payload.completedWordIds.length !== progressQuery.data.completedWordIds.length ||
-      payload.completedDayNumbers.length !== progressQuery.data.completedDayNumbers.length
-    ) {
-      saveProgressMutation.mutate({ data: payload });
-    }
     hydratedUserRef.current = user.id;
-  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, days, reviewDates, saveProgressMutation]);
+  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, days, reviewDates]);
+
+  useEffect(() => {
+    if (!authLoaded) return;
+    const userId = isSignedIn ? user?.id : undefined;
+    window.localStorage.setItem(getStorageKey(reviewedStorageKey, userId), JSON.stringify([...reviewed].sort((a, b) => a - b)));
+    window.localStorage.setItem(getStorageKey(reviewDatesStorageKey, userId), JSON.stringify(reviewDates));
+  }, [authLoaded, isSignedIn, user?.id, reviewed, reviewDates]);
+
+  useEffect(() => {
+    if (!authLoaded || !isSignedIn || !user?.id || progressQuery.isLoading || !progressQuery.data || hydratedUserRef.current !== user.id) return;
+    const completedDayNumbers = [...new Set([
+      ...completedDays,
+      ...getCompletedDayNumbers(days, reviewed),
+    ])].sort((a, b) => a - b);
+    const payload: ProgressInput = {
+      completedWordIds: [...reviewed].sort((a, b) => a - b),
+      completedDayNumbers,
+      reviewDates,
+    };
+    const fingerprint = JSON.stringify(payload);
+    if (lastQueuedProgressRef.current === fingerprint) return;
+    lastQueuedProgressRef.current = fingerprint;
+    queueProgressSave(payload);
+  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, completedDays, days, reviewDates, queueProgressSave]);
   const filteredWords = useMemo(() => {
     const normalized = search.trim().toLocaleLowerCase();
     return editableWords.filter((word) => {
@@ -1511,22 +1528,11 @@ function Home() {
       const next = new Set(existing);
       next.add(id);
       const completedDayNumbers = getCompletedDayNumbers(days, next);
-      const userId = isSignedIn ? user?.id : undefined;
-      window.localStorage.setItem(getStorageKey(reviewedStorageKey, userId), JSON.stringify([...next]));
       setCompletedDays(new Set(completedDayNumbers));
-      if (userId) {
-        saveProgressMutation.mutate({
-          data: {
-            completedWordIds: [...next].sort((a, b) => a - b),
-            completedDayNumbers,
-          },
-        });
-      }
       return next;
     });
     setReviewDates((existing) => {
       const next = { ...existing, [id]: today };
-      window.localStorage.setItem(getStorageKey(reviewDatesStorageKey, isSignedIn ? user?.id : undefined), JSON.stringify(next));
       return next;
     });
   };
@@ -1547,14 +1553,7 @@ function Home() {
     const userId = isSignedIn ? user?.id : undefined;
     window.localStorage.removeItem(getStorageKey(reviewedStorageKey, userId));
     window.localStorage.removeItem(getStorageKey(reviewDatesStorageKey, userId));
-    if (userId) {
-      saveProgressMutation.mutate({
-        data: { completedWordIds: [], completedDayNumbers: [] },
-      });
-    }
   };
-  const nextMilestone = reviewed.size >= oxford3000.length ? oxford3000.length : Math.min(oxford3000.length, Math.ceil((reviewed.size + 1) / 200) * 200);
-  const wordsToMilestone = Math.max(0, nextMilestone - reviewed.size);
   return (
      <div className="app-shell paper-grain min-h-[100dvh] bg-[#f6f2e9]">
       <Sidebar view={view} setView={navigate} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} onReset={resetSession} reviewedToday={reviewedToday} />
@@ -1569,7 +1568,7 @@ function Home() {
              <div><div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.21em] text-[#24635f]"><span className="h-2 w-2 rounded-full bg-[#ef7657]" /> {t.learningDesk}</div><h1 className="mt-3 max-w-[620px] font-display text-[clamp(2.6rem,5.3vw,4.7rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-page">{view === 'study' ? <>{language === 'ar' ? 'اصنع مساحة لـ' : 'Make room for '}<em className="text-[#24635f]">{t.betterEnglish}</em></> : <>{t.everyWordHasAPlace} <em className="text-[#24635f]">{t.place}</em></>}</h1><p className="mt-4 max-w-[470px] text-[14px] leading-relaxed text-[#71776f]">{view === 'study' ? t.studyDescription : t.browseDescription}</p></div>
              <div className="flex items-center gap-2 text-right"><div><div className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">{t.currentStreak}</div><div className="mt-1 text-sm font-semibold text-[#202a40]">{currentStreak} {currentStreak === 1 ? t.day : t.days} <span className="ml-1 text-[#ef7657]">/</span> {currentStreak ? t.keepGoing : t.startToday}</div></div><div className="ml-2 flex h-11 w-11 items-center justify-center rounded-full border border-[#e6c94d] bg-[#f3d24f] font-display text-xl text-[#202a40]">{currentStreak}</div></div>
           </div>
-             <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-4"><StatCard label={t.wordsMet} value={String(reviewed.size)} detail={t.wordsOfGoal} accent="bg-[#24635f]" /><StatCard label={t.inThisView} value={String(filteredWords.length)} detail={t.matchingFilters} accent="bg-[#ef7657]" /><StatCard label={t.dailyRhythm} value={`${Math.min(reviewedToday, dailyGoal)} / ${dailyGoal}`} detail={t.dailyWordsSession} accent="bg-[#f3d24f]" /><StatCard label={t.nextMilestone} value={reviewed.size >= oxford3000.length ? t.complete : String(nextMilestone)} detail={reviewed.size >= oxford3000.length ? t.oxfordFinished : `${wordsToMilestone} ${t.wordsToGo}`} accent="bg-[#779c7b]" /></div>
+             <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-3"><StatCard label={t.wordsMet} value={String(reviewed.size)} detail={t.wordsOfGoal} accent="bg-[#24635f]" /><StatCard label={t.inThisView} value={String(filteredWords.length)} detail={t.matchingFilters} accent="bg-[#ef7657]" /><StatCard label={t.dailyRhythm} value={`${Math.min(reviewedToday, dailyGoal)} / ${dailyGoal}`} detail={t.dailyWordsSession} accent="bg-[#f3d24f]" /></div>
           <Filters search={search} setSearch={setSearch} level={level} setLevel={setLevel} part={part} setPart={setPart} resultCount={filteredWords.length} />
            <div className="mt-8" id="library">{view === 'study' ? <StudyHome words={filteredWords} currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} reviewed={reviewed} markReviewed={markReviewed} onSaveWord={saveWord} /> : <BrowseList words={filteredWords} onSelect={selectWord} />}</div>
             </>

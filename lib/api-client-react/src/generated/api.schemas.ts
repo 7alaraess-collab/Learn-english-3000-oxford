@@ -9,6 +9,8 @@ export interface HealthStatus {
   status: string;
 }
 
+export type ProgressReviewDates = {[key: string]: string};
+
 export interface Progress {
   /**
      * @items.minimum 1
@@ -20,7 +22,10 @@ export interface Progress {
      * @items.maximum 300
      */
   completedDayNumbers: number[];
+  reviewDates: ProgressReviewDates;
 }
+
+export type ProgressInputReviewDates = {[key: string]: string};
 
 export interface ProgressInput {
   /**
@@ -35,5 +40,6 @@ export interface ProgressInput {
      * @items.maximum 300
      */
   completedDayNumbers: number[];
+  reviewDates: ProgressInputReviewDates;
 }
 

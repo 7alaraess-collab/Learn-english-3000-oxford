@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ProgressInputReviewDates } from './progressInputReviewDates';
 
 export interface ProgressInput {
   /**
@@ -19,4 +20,5 @@ export interface ProgressInput {
      * @items.maximum 300
      */
   completedDayNumbers: number[];
+  reviewDates: ProgressInputReviewDates;
 }
