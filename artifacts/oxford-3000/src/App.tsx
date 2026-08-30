@@ -729,15 +729,21 @@ function readWordOverrides() {
   }
 }
 
-function getCurrentStreak(reviewDates: Record<string, string>) {
-  const activeDays = new Set(Object.values(reviewDates));
-  let streak = 0;
-  const cursor = new Date();
-  while (activeDays.has(localDateKey(cursor))) {
-    streak += 1;
-    cursor.setDate(cursor.getDate() - 1);
+function getCurrentStreak(completedDays: Set<number>) {
+  const orderedDays = [...completedDays].sort((a, b) => a - b);
+  let longestStreak = 0;
+  let currentStreak = 0;
+  let previousDay: number | undefined;
+
+  for (const dayNumber of orderedDays) {
+    currentStreak = previousDay !== undefined && dayNumber === previousDay + 1
+      ? currentStreak + 1
+      : 1;
+    longestStreak = Math.max(longestStreak, currentStreak);
+    previousDay = dayNumber;
   }
-  return streak;
+
+  return longestStreak;
 }
 
 function getCompletedDayNumbers(days: EditableWord[][], reviewed: Set<number>) {
@@ -1462,7 +1468,7 @@ function Home() {
   }, [mobileOpen]);
   const today = localDateKey();
   const reviewedToday = Object.values(reviewDates).filter((date) => date === today).length;
-  const currentStreak = getCurrentStreak(reviewDates);
+  const currentStreak = getCurrentStreak(completedDays);
   const editableWords = useMemo(() => sourceWords.map((word) => ({ ...word, ...(wordOverrides[word.id] ?? {}) })), [wordOverrides]);
   const days = useMemo(() => splitIntoDays(editableWords), [editableWords]);
   useEffect(() => {
