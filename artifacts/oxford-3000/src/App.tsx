@@ -77,6 +77,8 @@ const reviewDatesStorageKey = 'wordroom-review-dates';
 const completedDaysStorageKey = 'wordroom-completed-days';
 const dailyGoal = 12;
 const overridesStorageKey = 'wordroom-word-overrides';
+const themePreferenceStorageKey = 'wordroom-theme-preference';
+const systemThemeQuery = '(prefers-color-scheme: dark)';
 
 type EditableWord = {
   id: number;
@@ -391,6 +393,24 @@ function useTheme() {
   const context = useContext(ThemeContext);
   if (!context) throw new Error('useTheme must be used inside ThemeContext.Provider');
   return context;
+}
+
+function getSystemTheme(): Theme {
+  try {
+    return window.matchMedia?.(systemThemeQuery).matches ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+}
+
+function readInitialTheme(): Theme {
+  try {
+    const savedPreference = window.localStorage.getItem(themePreferenceStorageKey);
+    if (savedPreference === 'light' || savedPreference === 'dark') return savedPreference;
+  } catch {
+    // Fall back to the device preference when storage is unavailable.
+  }
+  return getSystemTheme();
 }
 
 const partOfSpeechTranslations: Record<string, { en: string; ar: string }> = {
@@ -872,7 +892,7 @@ function TopBar({ view, setView, openMenu, mobileOpen }: { view: AppView; setVie
   const { theme, setTheme } = useTheme();
   const formattedDate = new Intl.DateTimeFormat(language === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
   return (
-    <header className="app-topbar sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-[#ded8ca] bg-[#f6f2e9]/90 px-5 backdrop-blur-md md:ml-[264px] md:px-10">
+    <header className="app-topbar sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-[#ded8ca] bg-background/90 px-5 backdrop-blur-md md:ml-[264px] md:px-10">
       <div className="flex items-center gap-3">
         <button type="button" data-testid="button-open-menu" onClick={openMenu} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#d6d1c6] bg-[#fbf8f1] text-[#202a40] shadow-[0_2px_5px_rgba(31,41,55,.05)] transition-colors hover:border-[#24635f] hover:bg-[#e9e3d7] md:hidden" aria-label={t.openMenu} aria-controls="mobile-sidebar" aria-expanded={mobileOpen}><Menu size={20} strokeWidth={2.25} /></button>
         <div className="font-mono-custom text-[10px] uppercase tracking-[0.18em] text-[#858982]">{formattedDate}</div>
@@ -1614,7 +1634,7 @@ function Home() {
     }
   };
   return (
-     <div className="app-shell paper-grain min-h-[100dvh] bg-[#f6f2e9]">
+     <div className="app-shell paper-grain min-h-[100dvh] bg-background">
        <Sidebar view={view} setView={navigate} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} onReset={resetAllData} reviewedToday={reviewedToday} />
       <TopBar view={view} setView={navigate} openMenu={() => setMobileOpen(true)} mobileOpen={mobileOpen} />
        <main className="app-main ml-0 px-5 pb-16 pt-9 md:ml-[264px] md:px-10 md:pt-12">
@@ -1648,7 +1668,7 @@ function stripBase(path: string) {
 
 function SignInPage() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-[#f6f2e9] px-4 py-8">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-8">
       <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
     </div>
   );
@@ -1656,7 +1676,7 @@ function SignInPage() {
 
 function SignUpPage() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-[#f6f2e9] px-4 py-8">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-8">
       <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
     </div>
   );
@@ -1866,13 +1886,16 @@ function App() {
       return 'en';
     }
   });
-  const [theme, setTheme] = useState<Theme>(() => {
+  const [theme, setTheme] = useState<Theme>(readInitialTheme);
+
+  const setThemePreference = useCallback((nextTheme: Theme) => {
+    setTheme(nextTheme);
     try {
-      return window.localStorage.getItem('wordroom-theme') === 'dark' ? 'dark' : 'light';
+      window.localStorage.setItem(themePreferenceStorageKey, nextTheme);
     } catch {
-      return 'light';
+      // Theme preference is optional when storage is unavailable.
     }
-  });
+  }, []);
 
   useEffect(() => {
     const direction = language === 'ar' ? 'rtl' : 'ltr';
@@ -1887,18 +1910,42 @@ function App() {
   }, [language]);
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia?.(systemThemeQuery);
+    if (!mediaQuery) return;
+
+    const syncWithSystemTheme = (event: MediaQueryListEvent) => {
+      try {
+        if (window.localStorage.getItem(themePreferenceStorageKey)) return;
+      } catch {
+        // Continue syncing with the device when storage is unavailable.
+      }
+      setTheme(event.matches ? 'dark' : 'light');
+    };
+
+    mediaQuery.addEventListener?.('change', syncWithSystemTheme);
+    return () => mediaQuery.removeEventListener?.('change', syncWithSystemTheme);
+  }, []);
+
+  useEffect(() => {
+    const isDark = theme === 'dark';
     document.documentElement.classList.toggle('dark', theme === 'dark');
     document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    document.body.style.colorScheme = theme;
+
+    const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    themeColor?.setAttribute('content', isDark ? '#101827' : '#ffffff');
+
     try {
-      window.localStorage.setItem('wordroom-theme', theme);
+      window.localStorage.removeItem('wordroom-theme');
     } catch {
-      // Theme preference is optional when storage is unavailable.
+      // Clean up the legacy preference when storage is available.
     }
   }, [theme]);
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t: translations[language] }}>
-      <ThemeContext.Provider value={{ theme, setTheme }}><WouterRouter base={basePath}><ClerkProviderWithRoutes /></WouterRouter></ThemeContext.Provider>
+      <ThemeContext.Provider value={{ theme, setTheme: setThemePreference }}><WouterRouter base={basePath}><ClerkProviderWithRoutes /></WouterRouter></ThemeContext.Provider>
     </LanguageContext.Provider>
   );
 }

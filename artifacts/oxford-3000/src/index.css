@@ -25,10 +25,10 @@
 }
 
 :root {
-  --app-page: #f6f2e9; --app-surface: #fbf8f1; --app-input: #f1ede4; --app-subtle: #e9e3d7;
+  --app-page: #ffffff; --app-surface: #fbf8f1; --app-input: #f1ede4; --app-subtle: #e9e3d7;
   --app-border: #ded8ca; --app-border-soft: #e8e2d7; --app-ink: #202a40; --app-muted: #71776f; --app-faint: #858982;
   --app-teal: #24635f; --app-yellow: #f3d24f; --app-coral: #ef7657;
-  --background: 42 35% 94%; --foreground: 223 31% 18%; --border: 36 20% 82%; --input: 36 20% 82%; --ring: 184 67% 35%;
+  --background: 0 0% 100%; --foreground: 223 31% 18%; --border: 36 20% 82%; --input: 36 20% 82%; --ring: 184 67% 35%;
   --card: 42 42% 97%; --card-foreground: 223 31% 18%; --card-border: 36 24% 86%;
   --popover: 42 42% 97%; --popover-foreground: 223 31% 18%; --popover-border: 36 24% 86%;
   --primary: 184 67% 31%; --primary-foreground: 42 42% 97%; --secondary: 31 64% 89%; --secondary-foreground: 223 31% 18%;
@@ -54,8 +54,9 @@
 }
 @layer base {
   * { @apply border-border; }
-  html { scroll-behavior: smooth; background: var(--app-page); transition: background-color .25s ease, color .25s ease; }
-  body { @apply font-sans antialiased bg-background text-foreground; }
+  html { scroll-behavior: smooth; background: var(--app-page); color-scheme: light; transition: background-color .25s ease, color .25s ease; }
+  body { @apply font-sans antialiased bg-background text-foreground; min-height: 100%; }
+  #root { min-height: 100%; background-color: var(--app-page); color: var(--app-ink); }
   button, input, select { font: inherit; }
   html[dir='rtl'] body { direction: rtl; }
 }
@@ -93,6 +94,8 @@
 
 /* The product uses a warm editorial palette in light mode. These targeted
    overrides let the existing utility classes share the same dark tokens. */
+.dark { color-scheme: dark; }
+.dark #root { background-color: var(--app-page); color: var(--app-ink); }
 .dark body { background: var(--app-page); }
 .dark .app-shell { background-color: var(--app-page) !important; color: var(--app-ink); }
 .dark .app-topbar { background-color: color-mix(in srgb, var(--app-page) 92%, transparent) !important; border-color: var(--app-border) !important; }
