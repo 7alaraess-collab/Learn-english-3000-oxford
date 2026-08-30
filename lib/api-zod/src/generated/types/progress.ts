@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProgressReviewDates } from './progressReviewDates';
+import type { ProgressReviewMilestones } from './progressReviewMilestones';
 
 export interface Progress {
   /**
@@ -19,4 +20,5 @@ export interface Progress {
      */
   completedDayNumbers: number[];
   reviewDates: ProgressReviewDates;
+  reviewMilestones: ProgressReviewMilestones;
 }

@@ -5,7 +5,7 @@ import { arSA } from '@clerk/localizations';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { getGetProgressQueryKey, useGetProgress, useSaveProgress, type ProgressInput } from '@workspace/api-client-react';
-import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, Command, Gamepad2, Layers3, Link2, ListFilter, Menu, Moon, Pencil, RotateCcw, Save, Search, Shuffle, Sparkles, SpellCheck, Sun, Volume2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, Command, Gamepad2, Layers3, Link2, ListFilter, Lock, Menu, Moon, Pencil, RotateCcw, Save, Search, Shuffle, Sparkles, SpellCheck, Sun, Volume2, X } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -74,6 +74,7 @@ const levelOptions = ['All levels', 'A1', 'A2', 'B1', 'B2'];
 const typeOptions = ['All parts', 'Noun', 'Verb', 'Adjective', 'Adverb', 'Preposition'];
 const reviewedStorageKey = 'wordroom-reviewed';
 const reviewDatesStorageKey = 'wordroom-review-dates';
+const reviewMilestonesStorageKey = 'wordroom-review-milestones';
 const completedDaysStorageKey = 'wordroom-completed-days';
 const dailyGoal = 12;
 const overridesStorageKey = 'wordroom-word-overrides';
@@ -91,7 +92,7 @@ type EditableWord = {
 };
 
 type WordOverrides = Partial<Omit<EditableWord, 'id'>>;
-type AppView = 'study' | 'browse' | 'all-days';
+type AppView = 'study' | 'browse' | 'review' | 'all-days';
 type Language = 'en' | 'ar';
 type Theme = 'light' | 'dark';
 type QuizMode = 'word-building' | 'multiple-choice' | 'matching';
@@ -115,6 +116,8 @@ const translations = {
     builtForLongGame: 'Built for the long game',
     study: 'Study',
     browse: 'Browse',
+    wordLibrary: 'Word library',
+    review: 'Review',
     allDays: 'All Days',
     login: 'Log in',
     signUp: 'Sign up',
@@ -235,6 +238,29 @@ const translations = {
     audio: 'Audio',
     playPronunciation: (label: string, shortLabel: string) => `Play ${label} in ${shortLabel} English`,
     pronunciationUnavailable: 'Speech playback is unavailable in this browser',
+    reviewTitle: 'Make it stick.',
+    reviewDescription: 'Return to the words you have already met. A little distance is where memory gets stronger.',
+    reviewDeskLabel: 'The recall desk',
+    reviewThreeDay: '3-day review',
+    reviewSixDay: '6-day review',
+    reviewThreeDayDescription: 'A fresh mix from your last three completed days.',
+    reviewSixDayDescription: 'A wider checkpoint across your last six completed days.',
+    reviewDaysReady: (count: number) => `${count} ${count === 1 ? 'day' : 'days'} completed`,
+    reviewWordsReady: (count: number) => `${count} ${count === 1 ? 'word' : 'words'} in the mix`,
+    reviewNeedDays: (count: number) => `Complete ${count} ${count === 1 ? 'day' : 'days'} to open this review.`,
+    reviewStart: 'Start review',
+    reviewAgain: 'Review again',
+    reviewCompleted: 'Completed',
+    reviewFreshMix: 'Fresh mix every time',
+    reviewSessionLabel: 'Milestone review',
+    reviewSessionDescription: (count: number) => `Move through ${count} words at your own pace. Mark each one when it feels familiar.`,
+    reviewSessionComplete: 'Checkpoint complete',
+    reviewSessionCompleteDescription: 'You returned to the words that matter. That is how vocabulary stays close.',
+    reviewBack: 'Back to reviews',
+    locked: 'Locked',
+    futureDayLocked: (day: number) => `Day ${day} is locked. Complete the pending milestone review in Review to open it.`,
+    openReview: 'Open Review',
+    dismiss: 'Dismiss',
   },
   ar: {
     languageButton: 'English',
@@ -254,6 +280,8 @@ const translations = {
     builtForLongGame: 'مصمم للتعلّم المستمر',
     study: 'دراسة',
     browse: 'تصفّح',
+    wordLibrary: 'مكتبة الكلمات',
+    review: 'مراجعة',
     allDays: 'كل الأيام',
     login: 'تسجيل الدخول',
     signUp: 'إنشاء حساب',
@@ -374,6 +402,29 @@ const translations = {
     audio: 'صوت',
     playPronunciation: (label: string, shortLabel: string) => `تشغيل نطق ${label} بلهجة ${shortLabel}`,
     pronunciationUnavailable: 'تشغيل النطق غير متاح في هذا المتصفح',
+    reviewTitle: 'ثبّت ما تعلّمت.',
+    reviewDescription: 'عُد إلى الكلمات التي التقيتها من قبل. قليل من المسافة يجعل الذاكرة أقوى.',
+    reviewDeskLabel: 'مكتب الاستدعاء',
+    reviewThreeDay: 'مراجعة 3 أيام',
+    reviewSixDay: 'مراجعة 6 أيام',
+    reviewThreeDayDescription: 'مزيج جديد من آخر ثلاثة أيام مكتملة.',
+    reviewSixDayDescription: 'محطة أوسع عبر آخر ستة أيام مكتملة.',
+    reviewDaysReady: (count: number) => `${count} ${count === 1 ? 'يوم مكتمل' : 'أيام مكتملة'}`,
+    reviewWordsReady: (count: number) => `${count} ${count === 1 ? 'كلمة في المزيج' : 'كلمات في المزيج'}`,
+    reviewNeedDays: (count: number) => `أكمل ${count === 1 ? 'يومًا' : `${count} أيام`} لفتح هذه المراجعة.`,
+    reviewStart: 'ابدأ المراجعة',
+    reviewAgain: 'مراجعة مجددًا',
+    reviewCompleted: 'مكتملة',
+    reviewFreshMix: 'مزيج جديد في كل مرة',
+    reviewSessionLabel: 'مراجعة مرحلية',
+    reviewSessionDescription: (count: number) => `مرّ على ${count} كلمة بالوتيرة التي تناسبك. علّم كل كلمة عندما تصبح مألوفة.`,
+    reviewSessionComplete: 'اكتملت المحطة',
+    reviewSessionCompleteDescription: 'عدت إلى الكلمات التي تهمك. هكذا تبقى المفردات قريبة.',
+    reviewBack: 'العودة إلى المراجعات',
+    locked: 'مقفلة',
+    futureDayLocked: (day: number) => `اليوم ${day} مقفل. أكمل المراجعة المرحلية المعلّقة في قسم المراجعة لفتحه.`,
+    openReview: 'فتح المراجعة',
+    dismiss: 'إغلاق',
   },
 } as const;
 
@@ -717,6 +768,16 @@ function readReviewDates(userId?: string) {
   }
 }
 
+function readReviewMilestones(userId?: string) {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(getStorageKey(reviewMilestonesStorageKey, userId)) ?? '{}') as unknown;
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {};
+    return Object.fromEntries(Object.entries(saved).filter(([, date]) => typeof date === 'string')) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
 function readCompletedDayNumbers(userId?: string) {
   try {
     const saved = JSON.parse(window.localStorage.getItem(getStorageKey(completedDaysStorageKey, userId)) ?? '[]') as unknown;
@@ -777,6 +838,43 @@ function getCompletedDayNumbers(days: EditableWord[][], reviewed: Set<number>) {
   }, []);
 }
 
+function getContiguousCompletedDayCount(completedDays: Set<number>, totalDays: number) {
+  let count = 0;
+  while (count < totalDays && completedDays.has(count + 1)) count += 1;
+  return count;
+}
+
+function getMilestoneKey(dayCount: 3 | 6, boundaryDay: number) {
+  return `review-${dayCount}-day-${boundaryDay}`;
+}
+
+function getReviewBoundary(dayCount: 3 | 6, completedThrough: number) {
+  if (completedThrough < dayCount) return undefined;
+  const boundary = Math.floor(completedThrough / dayCount) * dayCount;
+  if (dayCount === 3 && boundary % 6 === 0) return boundary - 3;
+  return boundary;
+}
+
+function getPendingMilestone(completedDays: Set<number>, reviewMilestones: Record<string, string>, totalDays: number) {
+  const completedThrough = getContiguousCompletedDayCount(completedDays, totalDays);
+  for (let boundaryDay = 3; boundaryDay <= completedThrough; boundaryDay += 3) {
+    const dayCount = boundaryDay % 6 === 0 ? 6 : 3;
+    const key = getMilestoneKey(dayCount, boundaryDay);
+    if (!reviewMilestones[key]) return { dayCount: dayCount as 3 | 6, boundaryDay, key };
+  }
+  return undefined;
+}
+
+function getNextUnlockedDay(completedDays: Set<number>, reviewMilestones: Record<string, string>, totalDays: number) {
+  const completedThrough = getContiguousCompletedDayCount(completedDays, totalDays);
+  if (completedThrough === 0) return 1;
+  if (completedThrough % 3 === 0) {
+    const dayCount = completedThrough % 6 === 0 ? 6 : 3;
+    if (!reviewMilestones[getMilestoneKey(dayCount as 3 | 6, completedThrough)]) return completedThrough;
+  }
+  return Math.min(completedThrough + 1, totalDays);
+}
+
 function Logo() {
   return (
     <div className="flex items-center gap-3" data-testid="text-brand">
@@ -796,8 +894,9 @@ function Sidebar({ view, setView, mobileOpen, closeMobile, onReset, reviewedToda
   const { language, t } = useLanguage();
   const nav = [
     { id: 'study' as const, label: language === 'ar' ? 'غرفة الدراسة' : 'Study room', subtitle: 'غرفة الدراسة', icon: Sparkles },
+    { id: 'browse' as const, label: t.wordLibrary, subtitle: language === 'ar' ? 'Word library' : 'مكتبة الكلمات', icon: Layers3 },
+    { id: 'review' as const, label: t.review, subtitle: language === 'ar' ? 'Review' : 'مراجعة', icon: RotateCcw },
     { id: 'all-days' as const, label: t.allDays, subtitle: 'جميع الأيام', icon: CalendarDays },
-    { id: 'browse' as const, label: language === 'ar' ? 'مكتبة الكلمات' : 'Word library', subtitle: 'مكتبة الكلمات', icon: Layers3 },
   ];
   return (
     <>
@@ -900,6 +999,7 @@ function TopBar({ view, setView, openMenu, mobileOpen }: { view: AppView; setVie
       <div className="flex items-center gap-2">
         <button type="button" data-testid="button-top-study" onClick={() => setView('study')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'study' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>{t.study}</button>
         <button type="button" data-testid="button-top-browse" onClick={() => setView('browse')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'browse' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>{t.browse}</button>
+        <button type="button" data-testid="button-top-review" onClick={() => setView('review')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'review' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>{t.review}</button>
         <button type="button" data-testid="button-top-all-days" onClick={() => setView('all-days')} className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:block ${view === 'all-days' ? 'bg-[#202a40] text-[#f9f5e9]' : 'text-[#71776f] hover:bg-[#e9e3d7]'}`}>{t.allDays}</button>
          <button type="button" role="switch" aria-checked={theme === 'dark'} aria-label={t.themeToggleLabel} data-testid="button-theme-toggle" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="theme-toggle inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] bg-[#fbf8f1] px-2.5 py-1.5 text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]">
            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
@@ -1175,8 +1275,184 @@ function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, markReviewe
   );
 }
 
-function AllDaysOverview({ days, reviewed, completedDays, onSelectDay }: { days: EditableWord[][]; reviewed: Set<number>; completedDays: Set<number>; onSelectDay: (dayIndex: number) => void }) {
+function getRecentReviewWords(days: EditableWord[][], completedDays: Set<number>, dayCount: number) {
+  const completedThrough = getContiguousCompletedDayCount(completedDays, days.length);
+  const recentDayNumbers = Array.from(
+    { length: Math.min(dayCount, completedThrough) },
+    (_, index) => completedThrough - index,
+  );
+  return shuffleItems(recentDayNumbers.flatMap((dayNumber) => days[dayNumber - 1] ?? []));
+}
+
+function ReviewMilestoneCard({ milestoneKey, dayCount, words, completed, onStart }: { milestoneKey: string; dayCount: number; words: EditableWord[]; completed: boolean; onStart: () => void }) {
+  const { t } = useLanguage();
+  const isReady = words.length > 0;
+  const title = dayCount === 3 ? t.reviewThreeDay : t.reviewSixDay;
+  const description = dayCount === 3 ? t.reviewThreeDayDescription : t.reviewSixDayDescription;
+  return (
+    <article className={`group relative overflow-hidden rounded-[26px] border p-6 transition-all duration-300 sm:p-8 ${dayCount === 3 ? 'border-[#d4cec0] bg-[#fbf8f1] hover:-translate-y-1 hover:border-[#24635f] hover:shadow-[0_16px_34px_rgba(31,41,55,.09)]' : 'border-[#d9cfae] bg-[#f5edda] hover:-translate-y-1 hover:border-[#b99a43] hover:shadow-[0_16px_34px_rgba(125,91,25,.1)]'}`} data-testid={`card-review-milestone-${dayCount}`}>
+      <div className={`absolute inset-x-0 top-0 h-1 ${dayCount === 3 ? 'bg-[#24635f]' : 'bg-[#ef7657]'}`} />
+      <div className="flex items-start justify-between gap-4">
+        <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${dayCount === 3 ? 'bg-[#d9eee9] text-[#24635f]' : 'bg-[#f8e7ba] text-[#a04b39]'}`}><span className="font-display text-[25px] leading-none">{dayCount}</span></div>
+        {completed && <span className="inline-flex items-center gap-1 rounded-full bg-[#d9eee9] px-2.5 py-1.5 font-mono-custom text-[9px] uppercase tracking-[.1em] text-[#24635f]" data-testid={`status-review-complete-${dayCount}`}><Check size={11} /> {t.reviewCompleted}</span>}
+      </div>
+      <div className="mt-8">
+        <div className="font-mono-custom text-[10px] uppercase tracking-[.18em] text-[#858982]">{t.reviewDeskLabel}</div>
+        <h2 className="mt-2 font-display text-[clamp(2rem,4vw,3rem)] leading-none tracking-[-.05em] text-[#202a40]">{title}</h2>
+        <p className="mt-3 max-w-[360px] text-sm leading-relaxed text-[#71776f]">{description}</p>
+      </div>
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-[#e4ded2] pt-5">
+        <div>
+          <div className="font-mono-custom text-[10px] uppercase tracking-[.14em] text-[#858982]" data-testid={`text-review-word-count-${dayCount}`}>{isReady ? t.reviewWordsReady(words.length) : t.reviewNeedDays(dayCount)}</div>
+          {isReady && <div className="mt-1 text-xs font-semibold text-[#24635f]">{t.reviewFreshMix}</div>}
+        </div>
+        <button type="button" data-testid={`button-start-review-${dayCount}`} disabled={!isReady} onClick={onStart} className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-45 ${dayCount === 3 ? 'bg-[#202a40] text-[#f9f5e9] hover:-translate-y-0.5 hover:bg-[#2c3852]' : 'bg-[#ef7657] text-[#fff8ee] hover:-translate-y-0.5 hover:bg-[#c95b43]'}`}>
+          {completed ? t.reviewAgain : t.reviewStart} <ArrowRight size={14} />
+        </button>
+      </div>
+      <span className="sr-only">{milestoneKey}</span>
+    </article>
+  );
+}
+
+function ReviewSession({ milestoneKey, dayCount, words, reviewed, onMarkReviewed, onSaveWord, onComplete, onBack }: { milestoneKey: string; dayCount: number; words: EditableWord[]; reviewed: Set<number>; onMarkReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void; onComplete: (key: string) => void; onBack: () => void }) {
+  const { t } = useLanguage();
+  const [sessionWordIds, setSessionWordIds] = useState<number[]>(() => words.map((word) => word.id));
+  const [flashcardIndex, setFlashcardIndex] = useState(0);
+  const [revealed, setRevealed] = useState(false);
+  const [pendingReviewIds, setPendingReviewIds] = useState<Set<number>>(new Set());
+  const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
+  const [sessionComplete, setSessionComplete] = useState(false);
+  const sessionWords = sessionWordIds.map((id) => words.find((word) => word.id === id)).filter((word): word is EditableWord => Boolean(word));
+  const currentWord = sessionWords[flashcardIndex] ?? sessionWords[0];
+
+  const moveNext = () => {
+    setRevealed(false);
+    setFlashcardIndex((current) => (current + 1) % Math.max(sessionWords.length, 1));
+  };
+  const movePrevious = () => {
+    setRevealed(false);
+    setFlashcardIndex((current) => (current - 1 + sessionWords.length) % sessionWords.length);
+  };
+  const shuffleCurrent = () => {
+    setRevealed(false);
+    setFlashcardIndex(Math.floor(Math.random() * sessionWords.length));
+  };
+  const completeCard = (result: 'got-it' | 'review-later') => {
+    if (!currentWord || sessionComplete) return;
+    const nextPendingIds = new Set(pendingReviewIds);
+    const nextCompletedIds = new Set(completedIds);
+    if (result === 'got-it') {
+      nextPendingIds.delete(currentWord.id);
+      nextCompletedIds.add(currentWord.id);
+      onMarkReviewed(currentWord.id);
+    } else {
+      nextPendingIds.add(currentWord.id);
+    }
+    setPendingReviewIds(nextPendingIds);
+    setCompletedIds(nextCompletedIds);
+    setRevealed(false);
+    if (flashcardIndex < sessionWords.length - 1) {
+      setFlashcardIndex((current) => current + 1);
+      return;
+    }
+    const nextRoundIds = sessionWords.filter((word) => nextPendingIds.has(word.id)).map((word) => word.id);
+    if (nextRoundIds.length > 0) {
+      setSessionWordIds(nextRoundIds);
+      setFlashcardIndex(0);
+      return;
+    }
+    setSessionComplete(true);
+    onComplete(milestoneKey);
+  };
+
+  if (sessionComplete) {
+    return (
+      <section className="animate-celebrate" data-testid={`panel-review-session-complete-${dayCount}`}>
+        <div className="relative overflow-hidden rounded-[30px] border border-[#c9e2dc] bg-[#edf7f3] px-6 py-16 text-center shadow-[0_18px_42px_rgba(31,41,55,.08)] sm:px-12">
+          <div className="celebration-orbit celebration-orbit-one" />
+          <div className="celebration-orbit celebration-orbit-two" />
+          <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#24635f] text-[#f9f5e9] shadow-[0_0_0_10px_rgba(36,99,95,.08)]"><CheckCircle2 size={29} /></div>
+          <div className="relative mt-6 font-mono-custom text-[10px] uppercase tracking-[.18em] text-[#24635f]">{t.reviewSessionLabel}</div>
+          <h2 className="relative mt-3 font-display text-[clamp(2.3rem,6vw,4rem)] leading-none tracking-[-.055em] text-[#202a40]">{t.reviewSessionComplete}</h2>
+          <p className="relative mx-auto mt-4 max-w-[390px] text-sm leading-relaxed text-[#5f675f]">{t.reviewSessionCompleteDescription}</p>
+          <button type="button" data-testid="button-review-back-to-list" onClick={onBack} className="relative mt-8 inline-flex items-center gap-2 rounded-full bg-[#202a40] px-5 py-3 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852]"><ArrowLeft size={14} /> {t.reviewBack}</button>
+        </div>
+      </section>
+    );
+  }
+
+  if (!currentWord) return null;
+  return (
+    <section className="animate-rise" data-testid={`panel-review-session-${dayCount}`}>
+      <div className="mb-5 flex flex-col justify-between gap-4 border-b border-[#ded8ca] pb-6 sm:flex-row sm:items-end">
+        <div>
+          <button type="button" data-testid="button-review-session-back" onClick={onBack} className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#d6d1c6] bg-[#fbf8f1] px-3.5 py-2 text-xs font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]"><ArrowLeft size={14} /> {t.reviewBack}</button>
+          <div className="font-mono-custom text-[10px] uppercase tracking-[.18em] text-[#24635f]">{t.reviewSessionLabel} · {dayCount}</div>
+          <h1 className="mt-2 font-display text-[clamp(2.6rem,5vw,4.4rem)] leading-[.92] tracking-[-.06em] text-[#202a40]" data-testid="heading-review-session">{t.reviewTitle}</h1>
+          <p className="mt-3 max-w-[470px] text-sm leading-relaxed text-[#71776f]">{t.reviewSessionDescription(words.length)}</p>
+        </div>
+        <div className="rounded-2xl border border-[#ded8ca] bg-[#f5edda] px-4 py-3 sm:text-right">
+          <div className="font-mono-custom text-[9px] uppercase tracking-[.15em] text-[#858982]">{t.progress}</div>
+          <div className="mt-1 font-display text-2xl text-[#202a40]" data-testid="text-review-session-progress">{completedIds.size} <span className="font-sans text-xs text-[#71776f]">/ {words.length}</span></div>
+        </div>
+      </div>
+      <Flashcard word={currentWord} revealed={revealed} onReveal={() => setRevealed(true)} onNext={moveNext} onPrevious={movePrevious} onShuffle={shuffleCurrent} current={flashcardIndex} total={sessionWords.length} isReviewed={reviewed.has(currentWord.id)} onMarkReviewed={() => completeCard('got-it')} onSaveWord={onSaveWord} sessionActions={{ onGotIt: () => completeCard('got-it'), onReviewLater: () => completeCard('review-later') }} />
+      <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-[#9a9e94]" data-testid="text-review-session-status">{pendingReviewIds.size > 0 ? t.wordsToReview(pendingReviewIds.size) : t.reviewFreshMix}</div>
+    </section>
+  );
+}
+
+function ReviewView({ days, completedDays, reviewMilestones, reviewed, onMarkReviewed, onSaveWord, onCompleteReview }: { days: EditableWord[][]; completedDays: Set<number>; reviewMilestones: Record<string, string>; reviewed: Set<number>; onMarkReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void; onCompleteReview: (key: string) => void }) {
   const { language, t } = useLanguage();
+  const [activeSession, setActiveSession] = useState<{ key: string; dayCount: number; words: EditableWord[] } | null>(null);
+  const completedDayCount = getContiguousCompletedDayCount(completedDays, days.length);
+  const threeDayBoundary = getReviewBoundary(3, completedDayCount);
+  const sixDayBoundary = getReviewBoundary(6, completedDayCount);
+  const startReview = (dayCount: number) => {
+    const words = getRecentReviewWords(days, completedDays, dayCount);
+    if (words.length === 0) return;
+    const pendingMilestone = getPendingMilestone(completedDays, reviewMilestones, days.length);
+    const boundaryDay = pendingMilestone?.dayCount === dayCount
+      ? pendingMilestone.boundaryDay
+      : getReviewBoundary(dayCount as 3 | 6, completedDayCount) ?? completedDayCount;
+    setActiveSession({ key: getMilestoneKey(dayCount as 3 | 6, boundaryDay), dayCount, words });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  if (activeSession) {
+    return <ReviewSession milestoneKey={activeSession.key} dayCount={activeSession.dayCount} words={activeSession.words} reviewed={reviewed} onMarkReviewed={onMarkReviewed} onSaveWord={onSaveWord} onComplete={onCompleteReview} onBack={() => setActiveSession(null)} />;
+  }
+  const threeDayWords = completedDayCount >= 3 ? getRecentReviewWords(days, completedDays, 3) : [];
+  const sixDayWords = completedDayCount >= 6 ? getRecentReviewWords(days, completedDays, 6) : [];
+  return (
+    <section className="animate-rise" data-testid="section-review">
+      <div className="relative overflow-hidden rounded-[28px] border border-[#d4cec0] bg-[#fbf8f1] px-6 py-8 shadow-[0_10px_28px_rgba(31,41,55,.04)] sm:px-10 sm:py-10">
+        <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full border-[18px] border-[#f5edda]" />
+        <div className="absolute -bottom-24 left-1/3 h-48 w-48 rounded-full border-[12px] border-[#d9eee9]/70" />
+        <div className="relative flex flex-col justify-between gap-7 md:flex-row md:items-end">
+          <div>
+            <div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.21em] text-[#24635f]"><RotateCcw size={14} /> {t.reviewDeskLabel}</div>
+            <h1 className="mt-3 max-w-[670px] font-display text-[clamp(2.8rem,6vw,5.2rem)] leading-[.88] tracking-[-.07em] text-[#202a40]" data-testid="heading-review">{t.reviewTitle}</h1>
+            <p className="mt-4 max-w-[500px] text-[14px] leading-relaxed text-[#71776f]">{t.reviewDescription}</p>
+          </div>
+          <div className={language === 'ar' ? 'text-right md:text-left' : 'text-left md:text-right'}>
+            <div className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">{t.dailyMap}</div>
+            <div className="mt-1 font-display text-[32px] leading-none text-[#202a40]" data-testid="text-review-completed-days">{completedDayCount} <span className="font-sans text-sm font-medium text-[#71776f]">{t.days}</span></div>
+          </div>
+        </div>
+      </div>
+      <div className="mt-7 grid gap-4 lg:grid-cols-[1.12fr_.88fr]">
+        <ReviewMilestoneCard milestoneKey={getMilestoneKey(3, threeDayBoundary ?? 3)} dayCount={3} words={threeDayWords} completed={Boolean(threeDayBoundary && reviewMilestones[getMilestoneKey(3, threeDayBoundary)])} onStart={() => startReview(3)} />
+        <ReviewMilestoneCard milestoneKey={getMilestoneKey(6, sixDayBoundary ?? 6)} dayCount={6} words={sixDayWords} completed={Boolean(sixDayBoundary && reviewMilestones[getMilestoneKey(6, sixDayBoundary)])} onStart={() => startReview(6)} />
+      </div>
+      <div className="mt-5 flex items-center gap-3 rounded-2xl border border-dashed border-[#d4cec0] bg-[#f6f2e9] px-5 py-4 text-xs leading-relaxed text-[#71776f]"><BookOpen size={16} className="shrink-0 text-[#ef7657]" /><span>{completedDayCount < 3 ? t.reviewNeedDays(3) : t.reviewFreshMix}</span></div>
+    </section>
+  );
+}
+
+function AllDaysOverview({ days, reviewed, completedDays, reviewMilestones, onSelectDay, onBlockedDay }: { days: EditableWord[][]; reviewed: Set<number>; completedDays: Set<number>; reviewMilestones: Record<string, string>; onSelectDay: (dayIndex: number) => void; onBlockedDay: (dayNumber: number) => void }) {
+  const { language, t } = useLanguage();
+  const nextUnlockedDay = getNextUnlockedDay(completedDays, reviewMilestones, days.length);
   return (
     <section className="animate-rise" data-testid="section-all-days">
       <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
@@ -1193,7 +1469,8 @@ function AllDaysOverview({ days, reviewed, completedDays, onSelectDay }: { days:
       <div className="mt-9 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {days.map((dayWords, dayIndex) => {
           const reviewedCount = dayWords.filter((word) => reviewed.has(word.id)).length;
-          const isComplete = completedDays.has(dayIndex + 1) || (dayWords.length > 0 && reviewedCount === dayWords.length);
+           const isLocked = dayIndex + 1 > nextUnlockedDay;
+          const isComplete = !isLocked && (completedDays.has(dayIndex + 1) || (dayWords.length > 0 && reviewedCount === dayWords.length));
           const firstWord = dayWords[0]?.word ?? '';
           const lastWord = dayWords[dayWords.length - 1]?.word ?? '';
           return (
@@ -1201,14 +1478,17 @@ function AllDaysOverview({ days, reviewed, completedDays, onSelectDay }: { days:
               type="button"
               key={dayIndex}
               data-testid={`button-all-days-day-${dayIndex + 1}`}
-              onClick={() => onSelectDay(dayIndex)}
-               className={`group relative overflow-hidden rounded-2xl border border-[#ded8ca] bg-[#fbf8f1] p-5 shadow-[0_2px_5px_rgba(31,41,55,.03)] transition-all duration-200 hover:-translate-y-1 hover:border-[#24635f] hover:shadow-[0_10px_22px_rgba(31,41,55,.08)] ${language === 'ar' ? 'text-right' : 'text-left'}`}
+               aria-disabled={isLocked}
+               onClick={() => isLocked ? onBlockedDay(dayIndex + 1) : onSelectDay(dayIndex)}
+                className={`group relative overflow-hidden rounded-2xl border border-[#ded8ca] bg-[#fbf8f1] p-5 shadow-[0_2px_5px_rgba(31,41,55,.03)] transition-all duration-200 ${isLocked ? 'cursor-not-allowed opacity-65' : 'hover:-translate-y-1 hover:border-[#24635f] hover:shadow-[0_10px_22px_rgba(31,41,55,.08)]'} ${language === 'ar' ? 'text-right' : 'text-left'}`}
             >
               <div className="absolute right-0 top-0 h-1 w-14 bg-[#f3d24f] transition-all duration-200 group-hover:w-24" />
               <div className="flex items-center justify-between">
                  <span className="font-mono-custom text-[10px] uppercase tracking-[.17em] text-[#858982]">{t.dailySet}</span>
-                {isComplete ? (
+                 {isComplete ? (
                    <span className="inline-flex items-center gap-1 rounded-full bg-[#d9eee9] px-2 py-1 font-mono-custom text-[9px] uppercase tracking-[.08em] text-[#24635f]"><Check size={11} /> {t.complete}</span>
+                 ) : isLocked ? (
+                   <span className="inline-flex items-center gap-1 rounded-full bg-[#e9e3d7] px-2 py-1 font-mono-custom text-[9px] uppercase tracking-[.08em] text-[#858982]"><Lock size={10} /> {t.locked}</span>
                 ) : (
                   <ArrowRight size={15} className="text-[#b7b8b0] transition-transform group-hover:translate-x-1 group-hover:text-[#ef7657]" />
                 )}
@@ -1219,7 +1499,7 @@ function AllDaysOverview({ days, reviewed, completedDays, onSelectDay }: { days:
               </div>
                <p className="mt-4 truncate text-xs text-[#71776f]" title={`${firstWord} — ${lastWord}`}>{firstWord} <span className="text-[#c6bfb1]">{t.to}</span> {lastWord}</p>
               <div className="mt-5 flex items-center gap-3 border-t border-[#e8e2d7] pt-4">
-                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e9e3d7]">
+                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e9e3d7]">
                   <div className="h-full rounded-full bg-[#24635f] transition-all duration-500" style={{ width: `${dayWords.length ? (reviewedCount / dayWords.length) * 100 : 0}%` }} />
                 </div>
                 <span className="font-mono-custom text-[10px] text-[#858982]">{reviewedCount}/{dayWords.length}</span>
@@ -1433,12 +1713,12 @@ function AllDaysDetail({ dayNumber, words, reviewed, onBack, onMarkReviewed, onS
   );
 }
 
-function AllDaysView({ days, reviewed, completedDays, selectedDayIndex, onSelectDay, onBack, onMarkReviewed, onSaveWord }: { days: EditableWord[][]; reviewed: Set<number>; completedDays: Set<number>; selectedDayIndex: number | null; onSelectDay: (dayIndex: number) => void; onBack: () => void; onMarkReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
+function AllDaysView({ days, reviewed, completedDays, reviewMilestones, selectedDayIndex, onSelectDay, onBlockedDay, onBack, onMarkReviewed, onSaveWord }: { days: EditableWord[][]; reviewed: Set<number>; completedDays: Set<number>; reviewMilestones: Record<string, string>; selectedDayIndex: number | null; onSelectDay: (dayIndex: number) => void; onBlockedDay: (dayNumber: number) => void; onBack: () => void; onMarkReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
   const selectedDay = selectedDayIndex === null ? undefined : days[selectedDayIndex];
   if (selectedDay && selectedDayIndex !== null) {
     return <AllDaysDetail dayNumber={selectedDayIndex + 1} words={selectedDay} reviewed={reviewed} onBack={onBack} onMarkReviewed={onMarkReviewed} onSaveWord={onSaveWord} />;
   }
-  return <AllDaysOverview days={days} reviewed={reviewed} completedDays={completedDays} onSelectDay={onSelectDay} />;
+  return <AllDaysOverview days={days} reviewed={reviewed} completedDays={completedDays} reviewMilestones={reviewMilestones} onSelectDay={onSelectDay} onBlockedDay={onBlockedDay} />;
 }
 
 function Home() {
@@ -1471,8 +1751,10 @@ function Home() {
   const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
   const [reviewed, setReviewed] = useState<Set<number>>(readReviewedIds);
   const [reviewDates, setReviewDates] = useState<Record<string, string>>(readReviewDates);
-  const [completedDays, setCompletedDays] = useState<Set<number>>(new Set());
+  const [reviewMilestones, setReviewMilestones] = useState<Record<string, string>>(readReviewMilestones);
+  const [completedDays, setCompletedDays] = useState<Set<number>>(readCompletedDayNumbers);
   const [wordOverrides, setWordOverrides] = useState<Record<string, WordOverrides>>(readWordOverrides);
+  const [blockedDay, setBlockedDay] = useState<number | null>(null);
   const authUserRef = useRef<string | null | undefined>(undefined);
   const hydratedUserRef = useRef<string | null>(null);
   const resetProgressUserRef = useRef<string | null>(null);
@@ -1506,6 +1788,7 @@ function Home() {
     if (userId) {
       const mergedReviewed = new Set([...readReviewedIds(userId), ...readReviewedIds()]);
       const mergedReviewDates = { ...readReviewDates(userId), ...readReviewDates() };
+      const mergedReviewMilestones = { ...readReviewMilestones(userId), ...readReviewMilestones() };
       const mergedCompletedDays = new Set([
         ...readCompletedDayNumbers(userId),
         ...readCompletedDayNumbers(),
@@ -1513,18 +1796,22 @@ function Home() {
       ]);
       setReviewed(mergedReviewed);
       setReviewDates(mergedReviewDates);
+      setReviewMilestones(mergedReviewMilestones);
       setCompletedDays(mergedCompletedDays);
       window.localStorage.setItem(getStorageKey(reviewedStorageKey, userId), JSON.stringify([...mergedReviewed]));
       window.localStorage.setItem(getStorageKey(reviewDatesStorageKey, userId), JSON.stringify(mergedReviewDates));
+      window.localStorage.setItem(getStorageKey(reviewMilestonesStorageKey, userId), JSON.stringify(mergedReviewMilestones));
       window.localStorage.setItem(getStorageKey(completedDaysStorageKey, userId), JSON.stringify([...mergedCompletedDays].sort((a, b) => a - b)));
       window.localStorage.removeItem(reviewedStorageKey);
       window.localStorage.removeItem(reviewDatesStorageKey);
+      window.localStorage.removeItem(reviewMilestonesStorageKey);
       window.localStorage.removeItem(completedDaysStorageKey);
     } else {
       const guestReviewed = readReviewedIds();
       const guestCompletedDays = readCompletedDayNumbers();
       setReviewed(guestReviewed);
       setReviewDates(readReviewDates());
+      setReviewMilestones(readReviewMilestones());
       setCompletedDays(new Set([
         ...guestCompletedDays,
         ...getCompletedDayNumbers(days, guestReviewed),
@@ -1540,6 +1827,7 @@ function Home() {
       ? new Set<number>()
       : new Set(progressQuery.data.completedWordIds.filter((id) => sourceWords.some((word) => word.id === id)));
     const mergedReviewDates = resettingProgress ? {} : { ...(progressQuery.data.reviewDates ?? {}), ...reviewDates };
+    const mergedReviewMilestones = resettingProgress ? {} : { ...(progressQuery.data.reviewMilestones ?? {}), ...reviewMilestones };
     const mergedReviewed = resettingProgress ? new Set<number>() : new Set([...reviewed, ...serverReviewed]);
     const mergedCompletedDays = new Set([
       ...(resettingProgress ? [] : progressQuery.data.completedDayNumbers),
@@ -1548,18 +1836,20 @@ function Home() {
     ]);
     setReviewed(mergedReviewed);
     setReviewDates(mergedReviewDates);
+    setReviewMilestones(mergedReviewMilestones);
     setCompletedDays(mergedCompletedDays);
     hydratedUserRef.current = user.id;
     resetProgressUserRef.current = null;
-  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, days, reviewDates]);
+  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, days, reviewDates, reviewMilestones]);
 
   useEffect(() => {
     if (!authLoaded) return;
     const userId = isSignedIn ? user?.id : undefined;
     window.localStorage.setItem(getStorageKey(reviewedStorageKey, userId), JSON.stringify([...reviewed].sort((a, b) => a - b)));
     window.localStorage.setItem(getStorageKey(reviewDatesStorageKey, userId), JSON.stringify(reviewDates));
+    window.localStorage.setItem(getStorageKey(reviewMilestonesStorageKey, userId), JSON.stringify(reviewMilestones));
     window.localStorage.setItem(getStorageKey(completedDaysStorageKey, userId), JSON.stringify([...completedDays].sort((a, b) => a - b)));
-  }, [authLoaded, isSignedIn, user?.id, reviewed, reviewDates, completedDays]);
+  }, [authLoaded, isSignedIn, user?.id, reviewed, reviewDates, reviewMilestones, completedDays]);
 
   useEffect(() => {
     if (!authLoaded || !isSignedIn || !user?.id || progressQuery.isLoading || !progressQuery.data || hydratedUserRef.current !== user.id) return;
@@ -1571,12 +1861,13 @@ function Home() {
       completedWordIds: [...reviewed].sort((a, b) => a - b),
       completedDayNumbers,
       reviewDates,
+      reviewMilestones,
     };
     const fingerprint = JSON.stringify(payload);
     if (lastQueuedProgressRef.current === fingerprint) return;
     lastQueuedProgressRef.current = fingerprint;
     queueProgressSave(payload);
-  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, completedDays, days, reviewDates, queueProgressSave]);
+  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, completedDays, days, reviewDates, reviewMilestones, queueProgressSave]);
   const filteredWords = useMemo(() => {
     const normalized = search.trim().toLocaleLowerCase();
     return editableWords.filter((word) => {
@@ -1603,12 +1894,16 @@ function Home() {
   const selectWord = (word: EditableWord) => { const index = filteredWords.findIndex((item) => item.id === word.id); setCurrentIndex(Math.max(index, 0)); setView('study'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const navigate = (nextView: AppView) => { setView(nextView); if (nextView === 'all-days') setSelectedDayIndex(null); };
   const selectDay = (dayIndex: number) => { setSelectedDayIndex(dayIndex); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const blockedDayNotice = (dayNumber: number) => setBlockedDay(dayNumber);
   const saveWord = (id: number, changes: WordOverrides) => {
     setWordOverrides((existing) => {
       const next = { ...existing, [id]: changes };
       window.localStorage.setItem(overridesStorageKey, JSON.stringify(next));
       return next;
     });
+  };
+  const completeReviewMilestone = (key: string) => {
+    setReviewMilestones((existing) => ({ ...existing, [key]: today }));
   };
   const resetAllData = () => {
     if (!window.confirm(t.resetAllDataConfirmation)) return;
@@ -1618,11 +1913,13 @@ function Home() {
       completedWordIds: [],
       completedDayNumbers: [],
       reviewDates: {},
+      reviewMilestones: {},
     };
     setReviewed(new Set());
     setReviewDates({});
+    setReviewMilestones({});
     setCompletedDays(new Set());
-    for (const key of [reviewedStorageKey, reviewDatesStorageKey, completedDaysStorageKey]) {
+    for (const key of [reviewedStorageKey, reviewDatesStorageKey, reviewMilestonesStorageKey, completedDaysStorageKey]) {
       window.localStorage.removeItem(getStorageKey(key, userId));
       window.localStorage.removeItem(getStorageKey(key));
     }
@@ -1637,10 +1934,20 @@ function Home() {
      <div className="app-shell paper-grain min-h-[100dvh] bg-background">
        <Sidebar view={view} setView={navigate} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} onReset={resetAllData} reviewedToday={reviewedToday} />
       <TopBar view={view} setView={navigate} openMenu={() => setMobileOpen(true)} mobileOpen={mobileOpen} />
+       {blockedDay !== null && (
+         <div role="alert" data-testid="status-blocked-day" className="fixed right-5 top-[88px] z-30 flex max-w-[360px] items-start gap-3 rounded-2xl border border-[#e6c94d] bg-[#f5edda] px-4 py-3 text-sm text-[#202a40] shadow-[0_12px_28px_rgba(31,41,55,.14)]">
+           <Lock size={16} className="mt-0.5 shrink-0 text-[#a04b39]" />
+           <span className="flex-1 leading-relaxed">{t.futureDayLocked(blockedDay)}</span>
+           <button type="button" data-testid="button-open-review-from-lock" onClick={() => { setView('review'); setBlockedDay(null); }} className="shrink-0 rounded-full bg-[#202a40] px-2.5 py-1.5 text-[11px] font-semibold text-[#f9f5e9] transition-colors hover:bg-[#2c3852]">{t.openReview}</button>
+           <button type="button" data-testid="button-dismiss-blocked-day" aria-label={t.dismiss} onClick={() => setBlockedDay(null)} className="rounded-full p-1 text-[#858982] transition-colors hover:bg-[#e9e3d7] hover:text-[#202a40]"><X size={14} /></button>
+         </div>
+       )}
        <main className="app-main ml-0 px-5 pb-16 pt-9 md:ml-[264px] md:px-10 md:pt-12">
         <div className="mx-auto max-w-[1250px]">
           {view === 'all-days' ? (
-            <AllDaysView days={days} reviewed={reviewed} completedDays={completedDays} selectedDayIndex={selectedDayIndex} onSelectDay={selectDay} onBack={() => setSelectedDayIndex(null)} onMarkReviewed={markReviewed} onSaveWord={saveWord} />
+             <AllDaysView days={days} reviewed={reviewed} completedDays={completedDays} reviewMilestones={reviewMilestones} selectedDayIndex={selectedDayIndex} onSelectDay={selectDay} onBlockedDay={blockedDayNotice} onBack={() => setSelectedDayIndex(null)} onMarkReviewed={markReviewed} onSaveWord={saveWord} />
+           ) : view === 'review' ? (
+             <ReviewView days={days} completedDays={completedDays} reviewMilestones={reviewMilestones} reviewed={reviewed} onMarkReviewed={markReviewed} onSaveWord={saveWord} onCompleteReview={completeReviewMilestone} />
           ) : (
             <>
            <div className="animate-rise mb-9 flex flex-col justify-between gap-5 md:flex-row md:items-end">

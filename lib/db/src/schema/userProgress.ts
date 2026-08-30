@@ -15,6 +15,10 @@ export const userProgressTable = pgTable("user_progress", {
     .$type<Record<string, string>>()
     .notNull()
     .default(sql`'{}'::jsonb`),
+  reviewMilestones: jsonb("review_milestones")
+    .$type<Record<string, string>>()
+    .notNull()
+    .default(sql`'{}'::jsonb`),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

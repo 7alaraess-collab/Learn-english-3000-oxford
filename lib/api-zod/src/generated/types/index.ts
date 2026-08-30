@@ -10,4 +10,6 @@ export * from './healthStatus';
 export * from './progress';
 export * from './progressInput';
 export * from './progressInputReviewDates';
+export * from './progressInputReviewMilestones';
 export * from './progressReviewDates';
+export * from './progressReviewMilestones';

@@ -1,6 +1,6 @@
-# [Project name]
+# Wordroom — Oxford 3000
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+An Arabic-friendly vocabulary learning desk for studying the Oxford 3000 through daily sets and milestone reviews.
 
 ## Run & Operate
 
@@ -22,15 +22,23 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/oxford-3000/src/App.tsx` — primary vocabulary UI, bilingual copy, study sessions, daily map, and Review milestone flow
+- `artifacts/oxford-3000/src/index.css` — shared warm editorial theme and dark-mode tokens
+- `lib/api-spec/openapi.yaml` — source of truth for synced learning progress
+- `lib/db/src/schema/userProgress.ts` — persisted user progress schema
+- `artifacts/api-server/src/routes/progress.ts` — authenticated progress sync
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Review completion is persisted as a keyed milestone map so the 3-day/6-day rhythm repeats across the full vocabulary journey.
+- The six-day checkpoint supersedes the three-day checkpoint at each six-day boundary, avoiding two mandatory reviews for the same stopping point.
+- Guest progress is stored locally and merged into the signed-in progress record when a user authenticates.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Study the Oxford 3000 one word at a time with pronunciation, examples, editing, and spaced review prompts.
+- Browse and filter the full library by search, CEFR level, and part of speech.
+- Progress through twelve-word daily sets; every three or six completed days unlocks a randomized milestone review before the next set opens.
 
 ## User preferences
 

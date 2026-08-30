@@ -98,10 +98,15 @@ components:
           type: object
           additionalProperties:
             type: string
+        reviewMilestones:
+          type: object
+          additionalProperties:
+            type: string
       required:
         - completedWordIds
         - completedDayNumbers
         - reviewDates
+        - reviewMilestones
     ProgressInput:
       type: object
       properties:
@@ -125,8 +130,13 @@ components:
           type: object
           additionalProperties:
             type: string
+        reviewMilestones:
+          type: object
+          additionalProperties:
+            type: string
       required:
         - completedWordIds
         - completedDayNumbers
         - reviewDates
+        - reviewMilestones
 
