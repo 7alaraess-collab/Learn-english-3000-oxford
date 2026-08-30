@@ -26,6 +26,11 @@ export interface Progress {
   completedDayNumbers: number[];
   reviewDates: ProgressReviewDates;
   reviewMilestones: ProgressReviewMilestones;
+  /**
+     * @items.minimum 1
+     * @items.maximum 3000
+     */
+  starredWordIds: number[];
 }
 
 export type ProgressInputReviewDates = {[key: string]: string};
@@ -47,5 +52,11 @@ export interface ProgressInput {
   completedDayNumbers: number[];
   reviewDates: ProgressInputReviewDates;
   reviewMilestones: ProgressInputReviewMilestones;
+  /**
+     * @maxItems 3000
+     * @items.minimum 1
+     * @items.maximum 3000
+     */
+  starredWordIds: number[];
 }
 

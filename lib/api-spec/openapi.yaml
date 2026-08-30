@@ -102,11 +102,18 @@ components:
           type: object
           additionalProperties:
             type: string
+        starredWordIds:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 3000
       required:
         - completedWordIds
         - completedDayNumbers
         - reviewDates
         - reviewMilestones
+        - starredWordIds
     ProgressInput:
       type: object
       properties:
@@ -134,9 +141,18 @@ components:
           type: object
           additionalProperties:
             type: string
+        starredWordIds:
+          type: array
+          maxItems: 3000
+          uniqueItems: true
+          items:
+            type: integer
+            minimum: 1
+            maximum: 3000
       required:
         - completedWordIds
         - completedDayNumbers
         - reviewDates
         - reviewMilestones
+        - starredWordIds
 

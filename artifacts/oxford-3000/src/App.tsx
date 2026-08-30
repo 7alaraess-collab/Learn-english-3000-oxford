@@ -5,7 +5,7 @@ import { arSA } from '@clerk/localizations';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { getGetProgressQueryKey, useGetProgress, useSaveProgress, type ProgressInput } from '@workspace/api-client-react';
-import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, Command, Gamepad2, Layers3, Link2, ListFilter, Lock, Menu, Moon, Pencil, RotateCcw, Save, Search, Shuffle, Sparkles, SpellCheck, Sun, Volume2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, Command, Gamepad2, Layers3, Link2, ListFilter, Lock, Menu, Moon, Pencil, RotateCcw, Save, Search, Shuffle, Sparkles, SpellCheck, Star, Sun, Volume2, X } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -76,6 +76,7 @@ const reviewedStorageKey = 'wordroom-reviewed';
 const reviewDatesStorageKey = 'wordroom-review-dates';
 const reviewMilestonesStorageKey = 'wordroom-review-milestones';
 const completedDaysStorageKey = 'wordroom-completed-days';
+const starredStorageKey = 'wordroom-starred';
 const dailyGoal = 12;
 const overridesStorageKey = 'wordroom-word-overrides';
 const themePreferenceStorageKey = 'wordroom-theme-preference';
@@ -92,7 +93,7 @@ type EditableWord = {
 };
 
 type WordOverrides = Partial<Omit<EditableWord, 'id'>>;
-type AppView = 'study' | 'browse' | 'review' | 'all-days';
+type AppView = 'study' | 'browse' | 'starred' | 'review' | 'all-days';
 type Language = 'en' | 'ar';
 type Theme = 'light' | 'dark';
 type QuizMode = 'word-building' | 'multiple-choice' | 'matching';
@@ -123,6 +124,15 @@ const translations = {
     study: 'Study',
     browse: 'Browse',
     wordLibrary: 'Word library',
+    starredWords: 'Starred Words',
+    starredWordsDescription: 'Keep the words that need another look close at hand.',
+    starWord: 'Star this word',
+    unstarWord: 'Remove from starred words',
+    noStarredWords: 'No starred words yet.',
+    noStarredWordsDescription: 'Tap the star on any word to build a focused shelf for difficult words.',
+    practiceStarred: 'Practice starred words',
+    backToStarred: 'Back to starred words',
+    starredCount: (count: number) => `${count} ${count === 1 ? 'word' : 'words'} starred`,
     review: 'Review',
     allDays: 'All Days',
     login: 'Log in',
@@ -291,6 +301,15 @@ const translations = {
     study: 'دراسة',
     browse: 'تصفّح',
     wordLibrary: 'مكتبة الكلمات',
+    starredWords: 'الكلمات المميزة',
+    starredWordsDescription: 'احتفظ بالكلمات التي تحتاج إلى نظرة أخرى في متناولك.',
+    starWord: 'تمييز هذه الكلمة',
+    unstarWord: 'إزالة الكلمة من المميزة',
+    noStarredWords: 'لا توجد كلمات مميزة بعد.',
+    noStarredWordsDescription: 'اضغط على النجمة بجانب أي كلمة لتبني مجموعة مركّزة للكلمات الصعبة.',
+    practiceStarred: 'تدرّب على الكلمات المميزة',
+    backToStarred: 'العودة إلى الكلمات المميزة',
+    starredCount: (count: number) => `${count} ${count === 1 ? 'كلمة مميزة' : 'كلمات مميزة'}`,
     review: 'مراجعة',
     allDays: 'كل الأيام',
     login: 'تسجيل الدخول',
@@ -776,6 +795,17 @@ function readReviewedIds(userId?: string) {
   }
 }
 
+function readStarredIds(userId?: string) {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(getStorageKey(starredStorageKey, userId)) ?? '[]') as unknown;
+    if (!Array.isArray(saved)) return new Set<number>();
+    const validIds = new Set<number>(oxford3000.map((word) => word.id));
+    return new Set(saved.filter((id): id is number => typeof id === 'number' && validIds.has(id)));
+  } catch {
+    return new Set<number>();
+  }
+}
+
 function readReviewDates(userId?: string) {
   try {
     const saved = JSON.parse(window.localStorage.getItem(getStorageKey(reviewDatesStorageKey, userId)) ?? '{}') as unknown;
@@ -924,6 +954,7 @@ function Sidebar({ view, setView, mobileOpen, closeMobile, onReset, reviewedToda
   const nav = [
     { id: 'study' as const, label: language === 'ar' ? 'غرفة الدراسة' : 'Study room', subtitle: 'غرفة الدراسة', icon: Sparkles },
     { id: 'browse' as const, label: t.wordLibrary, subtitle: language === 'ar' ? 'Word library' : 'مكتبة الكلمات', icon: Layers3 },
+    { id: 'starred' as const, label: t.starredWords, subtitle: language === 'ar' ? 'Starred Words' : 'الكلمات المميزة', icon: Star },
     { id: 'review' as const, label: t.review, subtitle: language === 'ar' ? 'Review' : 'مراجعة', icon: RotateCcw },
     { id: 'all-days' as const, label: t.allDays, subtitle: 'جميع الأيام', icon: CalendarDays },
   ];
@@ -1097,7 +1128,24 @@ function PronunciationButtons({ text, label, testIdPrefix }: { text: string; lab
   );
 }
 
-function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, current, total, isReviewed, onMarkReviewed, onSaveWord, sessionActions }: { word: EditableWord; revealed: boolean; onReveal: () => void; onNext: () => void; onPrevious: () => void; onShuffle: () => void; current: number; total: number; isReviewed: boolean; onMarkReviewed: () => void; onSaveWord: (id: number, changes: WordOverrides) => void; sessionActions?: { onGotIt: () => void; onReviewLater: () => void } }) {
+function StarButton({ isStarred, onToggle, testId }: { isStarred: boolean; onToggle: () => void; testId: string }) {
+  const { t } = useLanguage();
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      aria-label={isStarred ? t.unstarWord : t.starWord}
+      aria-pressed={isStarred}
+      title={isStarred ? t.unstarWord : t.starWord}
+      onClick={(event) => { event.stopPropagation(); onToggle(); }}
+      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-all ${isStarred ? 'border-[#e6c94d] bg-[#f8e7ba] text-[#a17818] hover:bg-[#f3d24f]' : 'border-[#d6d1c6] bg-[#f6f2e9] text-[#969b91] hover:border-[#e6c94d] hover:bg-[#f8e7ba] hover:text-[#a17818]'}`}
+    >
+      <Star size={16} fill={isStarred ? 'currentColor' : 'none'} strokeWidth={isStarred ? 2.2 : 1.8} />
+    </button>
+  );
+}
+
+function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, current, total, isReviewed, onMarkReviewed, onSaveWord, isStarred, onToggleStar, sessionActions }: { word: EditableWord; revealed: boolean; onReveal: () => void; onNext: () => void; onPrevious: () => void; onShuffle: () => void; current: number; total: number; isReviewed: boolean; onMarkReviewed: () => void; onSaveWord: (id: number, changes: WordOverrides) => void; isStarred: boolean; onToggleStar: () => void; sessionActions?: { onGotIt: () => void; onReviewLater: () => void } }) {
   const { language, t } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<WordOverrides>({});
@@ -1132,6 +1180,7 @@ function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, cu
            <span className="font-mono-custom text-[10px] uppercase tracking-[0.16em] text-[#858982]">{t.card} {String(current + 1).padStart(2, '0')} <span className="text-[#c8c1b2]">/ {String(total).padStart(2, '0')}</span></span>
            <div className="flex items-center gap-2">
              <span className={`rounded-full px-2.5 py-1 font-mono-custom text-[10px] font-medium ${word.level === 'A1' ? 'bg-[#d9eee9] text-[#24635f]' : word.level === 'A2' ? 'bg-[#e5e9d2] text-[#5d6732]' : word.level === 'B1' ? 'bg-[#f8e7ba] text-[#7d5b19]' : 'bg-[#f7d8cd] text-[#a04b39]'}`}>{word.level}</span>
+              <StarButton isStarred={isStarred} onToggle={onToggleStar} testId={`button-star-word-${word.id}`} />
               <button type="button" data-testid="button-edit-word" onClick={startEditing} className="inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] bg-[#f6f2e9] px-2.5 py-1.5 text-[11px] font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]"><Pencil size={12} /> {t.edit}</button>
            </div>
         </div>
@@ -1228,7 +1277,7 @@ function Filters({ search, setSearch, level, setLevel, part, setPart, resultCoun
   );
 }
 
-function BrowseList({ words, onSelect }: { words: EditableWord[]; onSelect: (word: EditableWord) => void }) {
+function BrowseList({ words, starred, onSelect, onToggleStar }: { words: EditableWord[]; starred: Set<number>; onSelect: (word: EditableWord) => void; onToggleStar: (id: number) => void }) {
   const { language, t } = useLanguage();
   return (
     <section className="animate-rise mt-6" data-testid="section-word-library">
@@ -1239,15 +1288,18 @@ function BrowseList({ words, onSelect }: { words: EditableWord[]; onSelect: (wor
       {words.length === 0 ? (
          <div className="rounded-2xl border border-dashed border-[#c9c2b5] bg-[#fbf8f1] px-6 py-16 text-center" data-testid="empty-search-results"><div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#f7d8cd] text-[#a04b39]"><Search size={18} /></div><h3 className="mt-4 font-display text-xl text-[#202a40]">{t.noWordsMatch}</h3><p className="mt-1 text-sm text-[#858982]">{t.tryDifferentSearch}</p></div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-[#ded8ca] bg-[#fbf8f1]" data-testid="list-words">
+         <div className="overflow-hidden rounded-2xl border border-[#ded8ca] bg-[#fbf8f1]" data-testid="list-words">
           {words.map((word, index) => (
-             <button type="button" key={word.id} data-testid={`button-word-${word.id}`} onClick={() => onSelect(word)} className={`group flex w-full items-center gap-4 border-b border-[#e8e2d7] px-4 py-4 transition-colors last:border-b-0 hover:bg-[#f5edda] sm:px-6 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-              <span className="w-6 font-mono-custom text-[10px] text-[#afb1a8]">{String(index + 1).padStart(2, '0')}</span>
-              <span className="min-w-0 flex-1"><span className="block font-display text-[22px] leading-none tracking-[-.02em] text-[#202a40] transition-colors group-hover:text-[#24635f]">{word.word}</span><span className="font-arabic mt-1 block text-xs text-[#858982]" dir="rtl">{word.translation}</span></span>
-               <span className="hidden rounded-full bg-[#e9e3d7] px-2.5 py-1 font-mono-custom text-[10px] capitalize text-[#666d65] sm:block">{displayPartOfSpeech(word.type, language)}</span>
-              <span className="w-8 text-center font-mono-custom text-[10px] text-[#24635f]">{word.level}</span>
-              <ArrowRight size={15} className="text-[#b7b8b0] transition-transform group-hover:translate-x-1 group-hover:text-[#ef7657]" />
-            </button>
+              <div key={word.id} className={`group flex w-full items-center gap-3 border-b border-[#e8e2d7] px-4 py-3 transition-colors last:border-b-0 hover:bg-[#f5edda] sm:px-6 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <button type="button" data-testid={`button-word-${word.id}`} onClick={() => onSelect(word)} className="flex min-w-0 flex-1 items-center gap-4 py-1">
+                 <span className="w-6 shrink-0 font-mono-custom text-[10px] text-[#afb1a8]">{String(index + 1).padStart(2, '0')}</span>
+                 <span className="min-w-0 flex-1"><span className="block font-display text-left text-[22px] leading-none tracking-[-.02em] text-[#202a40] transition-colors group-hover:text-[#24635f]">{word.word}</span><span className="font-arabic mt-1 block text-left text-xs text-[#858982]" dir="rtl">{word.translation}</span></span>
+                  <span className="hidden rounded-full bg-[#e9e3d7] px-2.5 py-1 font-mono-custom text-[10px] capitalize text-[#666d65] sm:block">{displayPartOfSpeech(word.type, language)}</span>
+                 <span className="w-8 shrink-0 text-center font-mono-custom text-[10px] text-[#24635f]">{word.level}</span>
+                 <ArrowRight size={15} className="shrink-0 text-[#b7b8b0] transition-transform group-hover:translate-x-1 group-hover:text-[#ef7657]" />
+                </button>
+                <StarButton isStarred={starred.has(word.id)} onToggle={() => onToggleStar(word.id)} testId={`button-star-word-${word.id}`} />
+              </div>
           ))}
         </div>
       )}
@@ -1255,7 +1307,99 @@ function BrowseList({ words, onSelect }: { words: EditableWord[]; onSelect: (wor
   );
 }
 
-function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, markReviewed, onSaveWord }: { words: EditableWord[]; currentIndex: number; setCurrentIndex: (index: number) => void; reviewed: Set<number>; markReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
+function StarredWordsView({ words, starred, reviewed, onToggleStar, onMarkReviewed, onSaveWord }: { words: EditableWord[]; starred: Set<number>; reviewed: Set<number>; onToggleStar: (id: number) => void; onMarkReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
+  const { language, t } = useLanguage();
+  const [practiceMode, setPracticeMode] = useState(false);
+  const [practiceIndex, setPracticeIndex] = useState(0);
+  const [revealed, setRevealed] = useState(false);
+  const current = words[practiceIndex] ?? words[0];
+
+  useEffect(() => {
+    setRevealed(false);
+  }, [current?.id]);
+
+  const startPractice = (index = 0) => {
+    setPracticeIndex(index);
+    setRevealed(false);
+    setPracticeMode(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const next = () => setPracticeIndex((currentIndex) => (currentIndex + 1) % words.length);
+  const previous = () => setPracticeIndex((currentIndex) => (currentIndex - 1 + words.length) % words.length);
+  const shuffle = () => setPracticeIndex(Math.floor(Math.random() * words.length));
+
+  if (practiceMode && current) {
+    return (
+      <section className="animate-rise" data-testid="section-starred-practice">
+        <button type="button" data-testid="button-starred-practice-back" onClick={() => setPracticeMode(false)} className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#d6d1c6] bg-[#fbf8f1] px-3.5 py-2 text-xs font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]">
+          <ArrowLeft size={14} /> {t.backToStarred}
+        </button>
+        <div className="mb-5 flex items-end justify-between gap-4 border-b border-[#ded8ca] pb-6">
+          <div>
+            <div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.21em] text-[#a17818]"><Star size={14} fill="currentColor" /> {t.starredWords}</div>
+            <h1 className="mt-3 font-display text-[clamp(2.8rem,6vw,5.2rem)] leading-[.88] tracking-[-.07em] text-[#202a40]">{t.practiceStarred}</h1>
+          </div>
+          <div className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">{practiceIndex + 1} / {words.length}</div>
+        </div>
+        <Flashcard
+          word={current}
+          revealed={revealed}
+          onReveal={() => setRevealed(true)}
+          onNext={next}
+          onPrevious={previous}
+          onShuffle={shuffle}
+          current={practiceIndex}
+          total={words.length}
+          isReviewed={reviewed.has(current.id)}
+          onMarkReviewed={() => onMarkReviewed(current.id)}
+          onSaveWord={onSaveWord}
+          isStarred={starred.has(current.id)}
+          onToggleStar={() => onToggleStar(current.id)}
+        />
+      </section>
+    );
+  }
+
+  return (
+    <section className="animate-rise" data-testid="section-starred-words">
+      <div className="flex flex-col justify-between gap-6 border-b border-[#ded8ca] pb-7 md:flex-row md:items-end">
+        <div>
+          <div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.21em] text-[#a17818]"><Star size={14} fill="currentColor" /> {t.starredWords}</div>
+          <h1 className="mt-3 max-w-[680px] font-display text-[clamp(2.8rem,6vw,5.2rem)] leading-[.88] tracking-[-.07em] text-[#202a40]" data-testid="heading-starred-words">{t.starredWords}</h1>
+          <p className="mt-4 max-w-[500px] text-[14px] leading-relaxed text-[#71776f]">{t.starredWordsDescription}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="font-mono-custom text-[10px] uppercase tracking-[.12em] text-[#858982]">{t.starredCount(words.length)}</span>
+          {words.length > 0 && <button type="button" data-testid="button-practice-starred" onClick={() => startPractice()} className="inline-flex items-center gap-2 rounded-full bg-[#202a40] px-4 py-2.5 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852]"><Layers3 size={14} /> {t.practiceStarred}</button>}
+        </div>
+      </div>
+      {words.length === 0 ? (
+        <div className="mt-7 rounded-[26px] border border-dashed border-[#c9c2b5] bg-[#fbf8f1] px-6 py-20 text-center" data-testid="empty-starred-words">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#f8e7ba] text-[#a17818]"><Star size={24} fill="currentColor" /></div>
+          <h2 className="mt-5 font-display text-2xl tracking-[-.03em] text-[#202a40]">{t.noStarredWords}</h2>
+          <p className="mx-auto mt-2 max-w-[400px] text-sm leading-relaxed text-[#858982]">{t.noStarredWordsDescription}</p>
+        </div>
+      ) : (
+        <div className="mt-7 overflow-hidden rounded-2xl border border-[#ded8ca] bg-[#fbf8f1]" data-testid="list-starred-words">
+          {words.map((word, index) => (
+            <div key={word.id} className={`group flex w-full items-center gap-3 border-b border-[#e8e2d7] px-4 py-4 last:border-b-0 sm:px-6 ${language === 'ar' ? 'text-right' : 'text-left'} hover:bg-[#f5edda]`}>
+              <button type="button" data-testid={`button-practice-starred-${word.id}`} onClick={() => startPractice(index)} className="flex min-w-0 flex-1 items-center gap-4 text-left">
+                <span className="w-6 shrink-0 font-mono-custom text-[10px] text-[#afb1a8]">{String(index + 1).padStart(2, '0')}</span>
+                <span className="min-w-0 flex-1"><span className="block font-display text-[22px] leading-none tracking-[-.02em] text-[#202a40] transition-colors group-hover:text-[#24635f]">{word.word}</span><span className="font-arabic mt-1 block text-xs text-[#858982]" dir="rtl">{word.translation}</span></span>
+                <span className="hidden rounded-full bg-[#e9e3d7] px-2.5 py-1 font-mono-custom text-[10px] capitalize text-[#666d65] sm:block">{displayPartOfSpeech(word.type, language)}</span>
+                <span className="w-8 shrink-0 text-center font-mono-custom text-[10px] text-[#24635f]">{word.level}</span>
+                <ArrowRight size={15} className="shrink-0 text-[#b7b8b0] transition-transform group-hover:translate-x-1 group-hover:text-[#ef7657]" />
+              </button>
+              <StarButton isStarred={starred.has(word.id)} onToggle={() => onToggleStar(word.id)} testId={`button-star-word-${word.id}`} />
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, starred, markReviewed, onToggleStar, onSaveWord }: { words: EditableWord[]; currentIndex: number; setCurrentIndex: (index: number) => void; reviewed: Set<number>; starred: Set<number>; markReviewed: (id: number) => void; onToggleStar: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
   const { language, t } = useLanguage();
   const [revealed, setRevealed] = useState(false);
   const current = words[currentIndex] ?? words[0];
@@ -1277,7 +1421,7 @@ function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, markReviewe
   return (
     <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_280px]">
       <div>
-         <Flashcard word={current} revealed={revealed} onReveal={() => setRevealed(true)} onNext={next} onPrevious={previous} onShuffle={shuffle} current={currentIndex} total={words.length} isReviewed={reviewed.has(current.id)} onMarkReviewed={() => markReviewed(current.id)} onSaveWord={onSaveWord} />
+          <Flashcard word={current} revealed={revealed} onReveal={() => setRevealed(true)} onNext={next} onPrevious={previous} onShuffle={shuffle} current={currentIndex} total={words.length} isReviewed={reviewed.has(current.id)} onMarkReviewed={() => markReviewed(current.id)} onSaveWord={onSaveWord} isStarred={starred.has(current.id)} onToggleStar={() => onToggleStar(current.id)} />
          <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-[#9a9e94]" data-testid="text-keyboard-hint"><span className="rounded border border-[#d8d2c6] bg-[#fbf8f1] px-1.5 py-0.5 font-mono-custom text-[10px]">space</span> {t.keyboardHint} <span className="mx-1 text-[#c5c0b5]">·</span> <span className="rounded border border-[#d8d2c6] bg-[#fbf8f1] px-1.5 py-0.5 font-mono-custom text-[10px]">← →</span> {t.keyboardMove}</div>
       </div>
       <aside className="space-y-4">
@@ -1404,7 +1548,7 @@ function ReviewMilestoneCard({ block, words, completed, locked, onStart }: { blo
   );
 }
 
-function ReviewSession({ milestoneKey, dayCount, startDay, endDay, words, reviewed, onMarkReviewed, onSaveWord, onComplete, onBack }: { milestoneKey: string; dayCount: number; startDay: number; endDay: number; words: EditableWord[]; reviewed: Set<number>; onMarkReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void; onComplete: (key: string) => void; onBack: () => void }) {
+function ReviewSession({ milestoneKey, dayCount, startDay, endDay, words, reviewed, starred, onMarkReviewed, onToggleStar, onSaveWord, onComplete, onBack }: { milestoneKey: string; dayCount: number; startDay: number; endDay: number; words: EditableWord[]; reviewed: Set<number>; starred: Set<number>; onMarkReviewed: (id: number) => void; onToggleStar: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void; onComplete: (key: string) => void; onBack: () => void }) {
   const { t } = useLanguage();
   const [sessionWordIds, setSessionWordIds] = useState<number[]>(() => words.map((word) => word.id));
   const [flashcardIndex, setFlashcardIndex] = useState(0);
@@ -1486,13 +1630,13 @@ function ReviewSession({ milestoneKey, dayCount, startDay, endDay, words, review
           <div className="mt-1 font-display text-2xl text-[#202a40]" data-testid="text-review-session-progress">{completedIds.size} <span className="font-sans text-xs text-[#71776f]">/ {words.length}</span></div>
         </div>
       </div>
-      <Flashcard word={currentWord} revealed={revealed} onReveal={() => setRevealed(true)} onNext={moveNext} onPrevious={movePrevious} onShuffle={shuffleCurrent} current={flashcardIndex} total={sessionWords.length} isReviewed={reviewed.has(currentWord.id)} onMarkReviewed={() => completeCard('got-it')} onSaveWord={onSaveWord} sessionActions={{ onGotIt: () => completeCard('got-it'), onReviewLater: () => completeCard('review-later') }} />
+       <Flashcard word={currentWord} revealed={revealed} onReveal={() => setRevealed(true)} onNext={moveNext} onPrevious={movePrevious} onShuffle={shuffleCurrent} current={flashcardIndex} total={sessionWords.length} isReviewed={reviewed.has(currentWord.id)} onMarkReviewed={() => completeCard('got-it')} onSaveWord={onSaveWord} isStarred={starred.has(currentWord.id)} onToggleStar={() => onToggleStar(currentWord.id)} sessionActions={{ onGotIt: () => completeCard('got-it'), onReviewLater: () => completeCard('review-later') }} />
       <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-[#9a9e94]" data-testid="text-review-session-status">{pendingReviewIds.size > 0 ? t.wordsToReview(pendingReviewIds.size) : t.reviewFreshMix}</div>
     </section>
   );
 }
 
-function ReviewView({ days, completedDays, reviewMilestones, reviewed, onMarkReviewed, onSaveWord, onCompleteReview }: { days: EditableWord[][]; completedDays: Set<number>; reviewMilestones: Record<string, string>; reviewed: Set<number>; onMarkReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void; onCompleteReview: (key: string) => void }) {
+function ReviewView({ days, completedDays, reviewMilestones, reviewed, starred, onMarkReviewed, onToggleStar, onSaveWord, onCompleteReview }: { days: EditableWord[][]; completedDays: Set<number>; reviewMilestones: Record<string, string>; reviewed: Set<number>; starred: Set<number>; onMarkReviewed: (id: number) => void; onToggleStar: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void; onCompleteReview: (key: string) => void }) {
   const { language, t } = useLanguage();
   const [activeSession, setActiveSession] = useState<{ block: ReviewBlock; words: EditableWord[] } | null>(null);
   const previousMixSignaturesRef = useRef<Record<string, string>>({});
@@ -1519,7 +1663,7 @@ function ReviewView({ days, completedDays, reviewMilestones, reviewed, onMarkRev
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   if (activeSession) {
-    return <ReviewSession milestoneKey={activeSession.block.key} dayCount={activeSession.block.dayCount} startDay={activeSession.block.startDay} endDay={activeSession.block.endDay} words={activeSession.words} reviewed={reviewed} onMarkReviewed={onMarkReviewed} onSaveWord={onSaveWord} onComplete={onCompleteReview} onBack={() => setActiveSession(null)} />;
+     return <ReviewSession milestoneKey={activeSession.block.key} dayCount={activeSession.block.dayCount} startDay={activeSession.block.startDay} endDay={activeSession.block.endDay} words={activeSession.words} reviewed={reviewed} starred={starred} onMarkReviewed={onMarkReviewed} onToggleStar={onToggleStar} onSaveWord={onSaveWord} onComplete={onCompleteReview} onBack={() => setActiveSession(null)} />;
   }
   const unlockedBlockCount = reviewBlocks.filter((block, index) => getBlockState(block, index).unlocked).length;
   return (
@@ -1619,7 +1763,7 @@ function AllDaysOverview({ days, reviewed, completedDays, reviewMilestones, onSe
   );
 }
 
-function AllDaysDetail({ dayNumber, words, reviewed, onBack, onMarkReviewed, onSaveWord }: { dayNumber: number; words: EditableWord[]; reviewed: Set<number>; onBack: () => void; onMarkReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
+function AllDaysDetail({ dayNumber, words, reviewed, starred, onBack, onMarkReviewed, onToggleStar, onSaveWord }: { dayNumber: number; words: EditableWord[]; reviewed: Set<number>; starred: Set<number>; onBack: () => void; onMarkReviewed: (id: number) => void; onToggleStar: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
   const { language, t } = useLanguage();
   const [flashcardMode, setFlashcardMode] = useState(false);
   const [sessionWordIds, setSessionWordIds] = useState<number[]>(words.map((word) => word.id));
@@ -1785,6 +1929,8 @@ function AllDaysDetail({ dayNumber, words, reviewed, onBack, onMarkReviewed, onS
                  isReviewed={reviewed.has(currentWord.id)}
                  onMarkReviewed={() => onMarkReviewed(currentWord.id)}
                  onSaveWord={onSaveWord}
+                  isStarred={starred.has(currentWord.id)}
+                  onToggleStar={() => onToggleStar(currentWord.id)}
                   sessionActions={{
                     onGotIt: () => completeCard('got-it'),
                     onReviewLater: () => completeCard('review-later'),
@@ -1809,6 +1955,7 @@ function AllDaysDetail({ dayNumber, words, reviewed, onBack, onMarkReviewed, onS
                  <p className="font-arabic mt-2 text-sm text-[#24635f]" dir="rtl">{word.translation}</p>
                </div>
                <div className="flex items-center gap-3 sm:justify-end">
+                   <StarButton isStarred={starred.has(word.id)} onToggle={() => onToggleStar(word.id)} testId={`button-star-word-${word.id}`} />
                   <span className={`rounded-full px-2.5 py-1 font-mono-custom text-[10px] ${word.level === 'A1' ? 'bg-[#d9eee9] text-[#24635f]' : word.level === 'A2' ? 'bg-[#e5e9d2] text-[#5d6732]' : word.level === 'B1' ? 'bg-[#f8e7ba] text-[#7d5b19]' : 'bg-[#f7d8cd] text-[#a04b39]'}`}>{word.level}</span>
                   {reviewed.has(word.id) && <span className="inline-flex items-center gap-1 font-mono-custom text-[9px] uppercase tracking-[.1em] text-[#24635f]"><Check size={12} /> {t.reviewed}</span>}
                </div>
@@ -1820,10 +1967,10 @@ function AllDaysDetail({ dayNumber, words, reviewed, onBack, onMarkReviewed, onS
   );
 }
 
-function AllDaysView({ days, reviewed, completedDays, reviewMilestones, selectedDayIndex, onSelectDay, onBlockedDay, onBack, onMarkReviewed, onSaveWord }: { days: EditableWord[][]; reviewed: Set<number>; completedDays: Set<number>; reviewMilestones: Record<string, string>; selectedDayIndex: number | null; onSelectDay: (dayIndex: number) => void; onBlockedDay: (dayNumber: number) => void; onBack: () => void; onMarkReviewed: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
+function AllDaysView({ days, reviewed, starred, completedDays, reviewMilestones, selectedDayIndex, onSelectDay, onBlockedDay, onBack, onMarkReviewed, onToggleStar, onSaveWord }: { days: EditableWord[][]; reviewed: Set<number>; starred: Set<number>; completedDays: Set<number>; reviewMilestones: Record<string, string>; selectedDayIndex: number | null; onSelectDay: (dayIndex: number) => void; onBlockedDay: (dayNumber: number) => void; onBack: () => void; onMarkReviewed: (id: number) => void; onToggleStar: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
   const selectedDay = selectedDayIndex === null ? undefined : days[selectedDayIndex];
   if (selectedDay && selectedDayIndex !== null) {
-    return <AllDaysDetail dayNumber={selectedDayIndex + 1} words={selectedDay} reviewed={reviewed} onBack={onBack} onMarkReviewed={onMarkReviewed} onSaveWord={onSaveWord} />;
+     return <AllDaysDetail dayNumber={selectedDayIndex + 1} words={selectedDay} reviewed={reviewed} starred={starred} onBack={onBack} onMarkReviewed={onMarkReviewed} onToggleStar={onToggleStar} onSaveWord={onSaveWord} />;
   }
   return <AllDaysOverview days={days} reviewed={reviewed} completedDays={completedDays} reviewMilestones={reviewMilestones} onSelectDay={onSelectDay} onBlockedDay={onBlockedDay} />;
 }
@@ -1857,6 +2004,7 @@ function Home() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
   const [reviewed, setReviewed] = useState<Set<number>>(readReviewedIds);
+  const [starred, setStarred] = useState<Set<number>>(readStarredIds);
   const [reviewDates, setReviewDates] = useState<Record<string, string>>(readReviewDates);
   const [reviewMilestones, setReviewMilestones] = useState<Record<string, string>>(readReviewMilestones);
   const [completedDays, setCompletedDays] = useState<Set<number>>(readCompletedDayNumbers);
@@ -1894,6 +2042,7 @@ function Home() {
     lastQueuedProgressRef.current = null;
     if (userId) {
       const mergedReviewed = new Set([...readReviewedIds(userId), ...readReviewedIds()]);
+      const mergedStarred = new Set([...readStarredIds(userId), ...readStarredIds()]);
       const mergedReviewDates = { ...readReviewDates(userId), ...readReviewDates() };
       const mergedReviewMilestones = normalizeReviewMilestones({ ...readReviewMilestones(userId), ...readReviewMilestones() });
       const mergedCompletedDays = new Set([
@@ -1902,21 +2051,26 @@ function Home() {
         ...getCompletedDayNumbers(days, mergedReviewed),
       ]);
       setReviewed(mergedReviewed);
+      setStarred(mergedStarred);
       setReviewDates(mergedReviewDates);
       setReviewMilestones(mergedReviewMilestones);
       setCompletedDays(mergedCompletedDays);
       window.localStorage.setItem(getStorageKey(reviewedStorageKey, userId), JSON.stringify([...mergedReviewed]));
+      window.localStorage.setItem(getStorageKey(starredStorageKey, userId), JSON.stringify([...mergedStarred]));
       window.localStorage.setItem(getStorageKey(reviewDatesStorageKey, userId), JSON.stringify(mergedReviewDates));
       window.localStorage.setItem(getStorageKey(reviewMilestonesStorageKey, userId), JSON.stringify(mergedReviewMilestones));
       window.localStorage.setItem(getStorageKey(completedDaysStorageKey, userId), JSON.stringify([...mergedCompletedDays].sort((a, b) => a - b)));
       window.localStorage.removeItem(reviewedStorageKey);
+      window.localStorage.removeItem(starredStorageKey);
       window.localStorage.removeItem(reviewDatesStorageKey);
       window.localStorage.removeItem(reviewMilestonesStorageKey);
       window.localStorage.removeItem(completedDaysStorageKey);
     } else {
       const guestReviewed = readReviewedIds();
+      const guestStarred = readStarredIds();
       const guestCompletedDays = readCompletedDayNumbers();
       setReviewed(guestReviewed);
+      setStarred(guestStarred);
       setReviewDates(readReviewDates());
       setReviewMilestones(readReviewMilestones());
       setCompletedDays(new Set([
@@ -1933,30 +2087,36 @@ function Home() {
     const serverReviewed = resettingProgress
       ? new Set<number>()
       : new Set(progressQuery.data.completedWordIds.filter((id) => sourceWords.some((word) => word.id === id)));
+    const serverStarred = resettingProgress
+      ? new Set<number>()
+      : new Set(progressQuery.data.starredWordIds.filter((id) => sourceWords.some((word) => word.id === id)));
     const mergedReviewDates = resettingProgress ? {} : { ...(progressQuery.data.reviewDates ?? {}), ...reviewDates };
     const mergedReviewMilestones = resettingProgress ? {} : normalizeReviewMilestones({ ...(progressQuery.data.reviewMilestones ?? {}), ...reviewMilestones });
     const mergedReviewed = resettingProgress ? new Set<number>() : new Set([...reviewed, ...serverReviewed]);
+    const mergedStarred = resettingProgress ? new Set<number>() : new Set([...starred, ...serverStarred]);
     const mergedCompletedDays = new Set([
       ...(resettingProgress ? [] : progressQuery.data.completedDayNumbers),
       ...(resettingProgress ? [] : readCompletedDayNumbers(user.id)),
       ...(resettingProgress ? [] : getCompletedDayNumbers(days, mergedReviewed)),
     ]);
     setReviewed(mergedReviewed);
+    setStarred(mergedStarred);
     setReviewDates(mergedReviewDates);
     setReviewMilestones(mergedReviewMilestones);
     setCompletedDays(mergedCompletedDays);
     hydratedUserRef.current = user.id;
     resetProgressUserRef.current = null;
-  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, days, reviewDates, reviewMilestones]);
+  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, starred, days, reviewDates, reviewMilestones]);
 
   useEffect(() => {
     if (!authLoaded) return;
     const userId = isSignedIn ? user?.id : undefined;
     window.localStorage.setItem(getStorageKey(reviewedStorageKey, userId), JSON.stringify([...reviewed].sort((a, b) => a - b)));
+    window.localStorage.setItem(getStorageKey(starredStorageKey, userId), JSON.stringify([...starred].sort((a, b) => a - b)));
     window.localStorage.setItem(getStorageKey(reviewDatesStorageKey, userId), JSON.stringify(reviewDates));
     window.localStorage.setItem(getStorageKey(reviewMilestonesStorageKey, userId), JSON.stringify(reviewMilestones));
     window.localStorage.setItem(getStorageKey(completedDaysStorageKey, userId), JSON.stringify([...completedDays].sort((a, b) => a - b)));
-  }, [authLoaded, isSignedIn, user?.id, reviewed, reviewDates, reviewMilestones, completedDays]);
+  }, [authLoaded, isSignedIn, user?.id, reviewed, starred, reviewDates, reviewMilestones, completedDays]);
 
   useEffect(() => {
     if (!authLoaded || !isSignedIn || !user?.id || progressQuery.isLoading || !progressQuery.data || hydratedUserRef.current !== user.id) return;
@@ -1966,6 +2126,7 @@ function Home() {
     ])].sort((a, b) => a - b);
     const payload: ProgressInput = {
       completedWordIds: [...reviewed].sort((a, b) => a - b),
+      starredWordIds: [...starred].sort((a, b) => a - b),
       completedDayNumbers,
       reviewDates,
       reviewMilestones,
@@ -1974,7 +2135,7 @@ function Home() {
     if (lastQueuedProgressRef.current === fingerprint) return;
     lastQueuedProgressRef.current = fingerprint;
     queueProgressSave(payload);
-  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, completedDays, days, reviewDates, reviewMilestones, queueProgressSave]);
+  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, starred, completedDays, days, reviewDates, reviewMilestones, queueProgressSave]);
   const filteredWords = useMemo(() => {
     const normalized = search.trim().toLocaleLowerCase();
     return editableWords.filter((word) => {
@@ -1984,6 +2145,7 @@ function Home() {
       return matchesSearch && matchesLevel && matchesPart;
     });
   }, [editableWords, search, level, part]);
+  const starredWords = useMemo(() => editableWords.filter((word) => starred.has(word.id)), [editableWords, starred]);
   useEffect(() => { if (currentIndex >= filteredWords.length) setCurrentIndex(0); }, [currentIndex, filteredWords.length]);
   const markReviewed = (id: number) => {
     setReviewed((existing) => {
@@ -1995,6 +2157,14 @@ function Home() {
     });
     setReviewDates((existing) => {
       const next = { ...existing, [id]: today };
+      return next;
+    });
+  };
+  const toggleStar = (id: number) => {
+    setStarred((existing) => {
+      const next = new Set(existing);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -2018,15 +2188,17 @@ function Home() {
     const userId = isSignedIn ? user?.id : undefined;
     const emptyProgress: ProgressInput = {
       completedWordIds: [],
+      starredWordIds: [],
       completedDayNumbers: [],
       reviewDates: {},
       reviewMilestones: {},
     };
     setReviewed(new Set());
+    setStarred(new Set());
     setReviewDates({});
     setReviewMilestones({});
     setCompletedDays(new Set());
-    for (const key of [reviewedStorageKey, reviewDatesStorageKey, reviewMilestonesStorageKey, completedDaysStorageKey]) {
+    for (const key of [reviewedStorageKey, starredStorageKey, reviewDatesStorageKey, reviewMilestonesStorageKey, completedDaysStorageKey]) {
       window.localStorage.removeItem(getStorageKey(key, userId));
       window.localStorage.removeItem(getStorageKey(key));
     }
@@ -2052,9 +2224,11 @@ function Home() {
        <main className="app-main ml-0 px-5 pb-16 pt-9 md:ml-[264px] md:px-10 md:pt-12">
         <div className="mx-auto max-w-[1250px]">
           {view === 'all-days' ? (
-             <AllDaysView days={days} reviewed={reviewed} completedDays={completedDays} reviewMilestones={reviewMilestones} selectedDayIndex={selectedDayIndex} onSelectDay={selectDay} onBlockedDay={blockedDayNotice} onBack={() => setSelectedDayIndex(null)} onMarkReviewed={markReviewed} onSaveWord={saveWord} />
+             <AllDaysView days={days} reviewed={reviewed} starred={starred} completedDays={completedDays} reviewMilestones={reviewMilestones} selectedDayIndex={selectedDayIndex} onSelectDay={selectDay} onBlockedDay={blockedDayNotice} onBack={() => setSelectedDayIndex(null)} onMarkReviewed={markReviewed} onToggleStar={toggleStar} onSaveWord={saveWord} />
+           ) : view === 'starred' ? (
+             <StarredWordsView words={starredWords} starred={starred} reviewed={reviewed} onToggleStar={toggleStar} onMarkReviewed={markReviewed} onSaveWord={saveWord} />
            ) : view === 'review' ? (
-             <ReviewView days={days} completedDays={completedDays} reviewMilestones={reviewMilestones} reviewed={reviewed} onMarkReviewed={markReviewed} onSaveWord={saveWord} onCompleteReview={completeReviewMilestone} />
+             <ReviewView days={days} completedDays={completedDays} reviewMilestones={reviewMilestones} reviewed={reviewed} starred={starred} onMarkReviewed={markReviewed} onToggleStar={toggleStar} onSaveWord={saveWord} onCompleteReview={completeReviewMilestone} />
           ) : (
             <>
            <div className="animate-rise mb-9 flex flex-col justify-between gap-5 md:flex-row md:items-end">
@@ -2063,7 +2237,7 @@ function Home() {
           </div>
              <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-3"><StatCard label={t.wordsMet} value={String(reviewed.size)} detail={t.wordsOfGoal} accent="bg-[#24635f]" /><StatCard label={t.inThisView} value={String(filteredWords.length)} detail={t.matchingFilters} accent="bg-[#ef7657]" /><StatCard label={t.dailyRhythm} value={`${Math.min(reviewedToday, dailyGoal)} / ${dailyGoal}`} detail={t.dailyWordsSession} accent="bg-[#f3d24f]" /></div>
           <Filters search={search} setSearch={setSearch} level={level} setLevel={setLevel} part={part} setPart={setPart} resultCount={filteredWords.length} />
-           <div className="mt-8" id="library">{view === 'study' ? <StudyHome words={filteredWords} currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} reviewed={reviewed} markReviewed={markReviewed} onSaveWord={saveWord} /> : <BrowseList words={filteredWords} onSelect={selectWord} />}</div>
+           <div className="mt-8" id="library">{view === 'study' ? <StudyHome words={filteredWords} currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} reviewed={reviewed} starred={starred} markReviewed={markReviewed} onToggleStar={toggleStar} onSaveWord={saveWord} /> : <BrowseList words={filteredWords} starred={starred} onSelect={selectWord} onToggleStar={toggleStar} />}</div>
             </>
           )}
         </div>

@@ -24,13 +24,16 @@ export const getProgressResponseCompletedWordIdsItemMax = 3000;
 
 export const getProgressResponseCompletedDayNumbersItemMax = 300;
 
+export const getProgressResponseStarredWordIdsItemMax = 3000;
+
 
 
 export const GetProgressResponse = zod.object({
   "completedWordIds": zod.array(zod.number().int().min(1).max(getProgressResponseCompletedWordIdsItemMax)),
   "completedDayNumbers": zod.array(zod.number().int().min(1).max(getProgressResponseCompletedDayNumbersItemMax)),
   "reviewDates": zod.record(zod.string(), zod.string()),
-  "reviewMilestones": zod.record(zod.string(), zod.string())
+  "reviewMilestones": zod.record(zod.string(), zod.string()),
+  "starredWordIds": zod.array(zod.number().int().min(1).max(getProgressResponseStarredWordIdsItemMax))
 })
 
 
@@ -45,18 +48,25 @@ export const saveProgressBodyCompletedDayNumbersItemMax = 300;
 
 export const saveProgressBodyCompletedDayNumbersMax = 300;
 
+export const saveProgressBodyStarredWordIdsItemMax = 3000;
+
+export const saveProgressBodyStarredWordIdsMax = 3000;
+
 
 
 export const SaveProgressBody = zod.object({
   "completedWordIds": zod.array(zod.number().int().min(1).max(saveProgressBodyCompletedWordIdsItemMax)).max(saveProgressBodyCompletedWordIdsMax),
   "completedDayNumbers": zod.array(zod.number().int().min(1).max(saveProgressBodyCompletedDayNumbersItemMax)).max(saveProgressBodyCompletedDayNumbersMax),
   "reviewDates": zod.record(zod.string(), zod.string()),
-  "reviewMilestones": zod.record(zod.string(), zod.string())
+  "reviewMilestones": zod.record(zod.string(), zod.string()),
+  "starredWordIds": zod.array(zod.number().int().min(1).max(saveProgressBodyStarredWordIdsItemMax)).max(saveProgressBodyStarredWordIdsMax)
 })
 
 export const saveProgressResponseCompletedWordIdsItemMax = 3000;
 
 export const saveProgressResponseCompletedDayNumbersItemMax = 300;
+
+export const saveProgressResponseStarredWordIdsItemMax = 3000;
 
 
 
@@ -64,7 +74,8 @@ export const SaveProgressResponse = zod.object({
   "completedWordIds": zod.array(zod.number().int().min(1).max(saveProgressResponseCompletedWordIdsItemMax)),
   "completedDayNumbers": zod.array(zod.number().int().min(1).max(saveProgressResponseCompletedDayNumbersItemMax)),
   "reviewDates": zod.record(zod.string(), zod.string()),
-  "reviewMilestones": zod.record(zod.string(), zod.string())
+  "reviewMilestones": zod.record(zod.string(), zod.string()),
+  "starredWordIds": zod.array(zod.number().int().min(1).max(saveProgressResponseStarredWordIdsItemMax))
 })
 
 

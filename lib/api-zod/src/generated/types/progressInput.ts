@@ -23,4 +23,10 @@ export interface ProgressInput {
   completedDayNumbers: number[];
   reviewDates: ProgressInputReviewDates;
   reviewMilestones: ProgressInputReviewMilestones;
+  /**
+     * @maxItems 3000
+     * @items.minimum 1
+     * @items.maximum 3000
+     */
+  starredWordIds: number[];
 }

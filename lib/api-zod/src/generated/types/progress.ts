@@ -21,4 +21,9 @@ export interface Progress {
   completedDayNumbers: number[];
   reviewDates: ProgressReviewDates;
   reviewMilestones: ProgressReviewMilestones;
+  /**
+     * @items.minimum 1
+     * @items.maximum 3000
+     */
+  starredWordIds: number[];
 }
