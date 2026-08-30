@@ -172,7 +172,7 @@ const translations = {
     cancel: 'Cancel',
     saveChanges: 'Save changes',
     exampleSentence: 'the example sentence',
-    tapToReveal: 'Tap to reveal',
+    tapToReveal: 'Click the card or press Space to flip',
     previous: 'Previous',
     inYourRhythm: 'In your rhythm',
     iKnowThis: 'I know this',
@@ -349,7 +349,7 @@ const translations = {
     cancel: 'إلغاء',
     saveChanges: 'حفظ التغييرات',
     exampleSentence: 'جملة المثال',
-    tapToReveal: 'اضغط لإظهار المعنى',
+    tapToReveal: 'اضغط على البطاقة أو مفتاح المسافة لقلبها',
     previous: 'السابق',
     inYourRhythm: 'ضمن إيقاعك',
     iKnowThis: 'أعرف هذه الكلمة',
@@ -1086,7 +1086,7 @@ function StatCard({ label, value, detail, accent }: { label: string; value: stri
   );
 }
 
-function PronunciationButtons({ text, label, testIdPrefix }: { text: string; label: string; testIdPrefix: string }) {
+function PronunciationButtons({ text, label, testIdPrefix, disabled = false }: { text: string; label: string; testIdPrefix: string; disabled?: boolean }) {
   const { language, t } = useLanguage();
   const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
   const speak = (locale: 'en-US' | 'en-GB') => {
@@ -1115,7 +1115,7 @@ function PronunciationButtons({ text, label, testIdPrefix }: { text: string; lab
           type="button"
           data-testid={`${testIdPrefix}-${shortLabel.toLowerCase()}`}
           onClick={() => speak(locale)}
-          disabled={!canSpeak}
+           disabled={disabled || !canSpeak}
           title={canSpeak ? t.playPronunciation(label, shortLabel) : t.pronunciationUnavailable}
           aria-label={t.playPronunciation(label, shortLabel)}
           className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[10px] font-semibold text-[#5f675f] transition-colors hover:bg-[#f3d24f] hover:text-[#202a40] disabled:cursor-not-allowed disabled:opacity-50"
@@ -1149,6 +1149,17 @@ function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, cu
   const { language, t } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<WordOverrides>({});
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== 'Space' || editing) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('button, input, textarea, select, [contenteditable="true"]')) return;
+      event.preventDefault();
+      onReveal();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editing, onReveal]);
   const startEditing = () => {
     setDraft({ word: word.word, type: word.type, level: word.level, translation: word.translation, example: word.example, exampleTranslation: word.exampleTranslation });
     setEditing(true);
@@ -1184,7 +1195,7 @@ function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, cu
               <button type="button" data-testid="button-edit-word" onClick={startEditing} className="inline-flex items-center gap-1.5 rounded-full border border-[#d6d1c6] bg-[#f6f2e9] px-2.5 py-1.5 text-[11px] font-semibold text-[#5f675f] transition-colors hover:border-[#24635f] hover:text-[#24635f]"><Pencil size={12} /> {t.edit}</button>
            </div>
         </div>
-         <div key={`${word.id}-${revealed}-${editing}`} className="card-flip min-h-[340px] px-6 py-10 sm:min-h-[360px] sm:px-12 sm:py-12">
+          <div key={word.id} className="min-h-[340px] px-6 py-10 sm:min-h-[360px] sm:px-12 sm:py-12">
            {editing ? (
              <div className="animate-fade" data-testid="panel-edit-word">
                 <div className="flex items-center gap-2 text-[#24635f]"><Pencil size={15} /><span className="font-mono-custom text-[10px] uppercase tracking-[0.17em]">{t.editThisCard}</span></div>
@@ -1202,30 +1213,60 @@ function Flashcard({ word, revealed, onReveal, onNext, onPrevious, onShuffle, cu
                </div>
              </div>
            ) : (
-             <>
+             <div
+               className={`flashcard-scene ${revealed ? 'is-flipped' : ''}`}
+               data-testid="interactive-flashcard"
+               role="button"
+               tabIndex={0}
+               aria-pressed={revealed}
+               aria-label={t.tapToReveal}
+               onClick={(event) => {
+                 if ((event.target as HTMLElement).closest('button')) return;
+                 onReveal();
+               }}
+               onKeyDown={(event) => {
+                 if ((event.target as HTMLElement).closest('button')) return;
+                 if (event.code === 'Space' || event.key === 'Enter') {
+                   event.preventDefault();
+                   event.stopPropagation();
+                   onReveal();
+                 }
+               }}
+             >
+               <div className="flashcard-rotor">
+                  <div className="flashcard-face flashcard-front" aria-hidden={revealed}>
           <div className="flex items-center gap-2 text-[#ef7657]">
             <span className="h-2 w-2 rounded-full bg-[#ef7657]" />
             <span className="font-mono-custom text-[10px] uppercase tracking-[0.17em]">{word.type}</span>
           </div>
           <div className="mt-7 flex flex-wrap items-end gap-x-4 gap-y-2">
             <h3 className="font-display text-[clamp(3.5rem,8vw,6.2rem)] leading-[.9] tracking-[-0.065em] text-[#202a40]" data-testid="text-current-word">{word.word}</h3>
-              <PronunciationButtons text={word.word} label={language === 'ar' ? `كلمة ${word.word}` : `the word ${word.word}`} testIdPrefix="button-pronounce-word" />
+                      <PronunciationButtons text={word.word} label={language === 'ar' ? `كلمة ${word.word}` : `the word ${word.word}`} testIdPrefix="button-pronounce-word" disabled={revealed} />
           </div>
-          {revealed ? (
-            <div className="animate-fade mt-8 border-t border-[#e4ded2] pt-6" data-testid="panel-answer">
-              <div className="font-arabic text-[26px] font-semibold leading-tight text-[#24635f]" dir="rtl" data-testid="text-translation">{word.translation}</div>
-               <div className="mt-5 grid gap-3 border-l-2 border-[#f3d24f] pl-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
-                 <div className="grid gap-2">
-                   <p className="text-[15px] leading-relaxed text-[#3d4651]" data-testid="text-example">“{word.example}”</p>
-                   <p className="font-arabic text-[13px] leading-relaxed text-[#858982]" dir="rtl" data-testid="text-example-translation">{word.exampleTranslation}</p>
-                 </div>
-                  <PronunciationButtons text={word.example} label={language === 'ar' ? 'جملة المثال' : t.exampleSentence} testIdPrefix="button-pronounce-example" />
+           <button type="button" data-testid="button-reveal" disabled={revealed} onClick={(event) => { event.stopPropagation(); onReveal(); }} className="mt-9 flex items-center gap-2 border-b border-dashed border-[#9da398] pb-1 text-sm font-semibold text-[#5f675f] transition-colors hover:border-[#ef7657] hover:text-[#c14f39] disabled:pointer-events-none">{t.tapToReveal} <ArrowRight size={15} /></button>
+                  </div>
+                  <div className="flashcard-face flashcard-back" aria-hidden={!revealed} data-testid="panel-answer">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-[#24635f]">
+                        <span className="h-2 w-2 rounded-full bg-[#24635f]" />
+                        <span className="font-mono-custom text-[10px] uppercase tracking-[0.17em]">{t.arabicTranslation}</span>
+                      </div>
+                      <PronunciationButtons text={word.word} label={language === 'ar' ? `كلمة ${word.word}` : `the word ${word.word}`} testIdPrefix="button-pronounce-word-back" disabled={!revealed} />
+                    </div>
+                    <div className="mt-7 border-b border-[#e4ded2] pb-6">
+                      <div className="font-arabic text-[clamp(2rem,5vw,3rem)] font-semibold leading-tight text-[#24635f]" dir="rtl" data-testid="text-translation">{word.translation}</div>
+                    </div>
+                    <div className="mt-5 grid gap-3 border-l-2 border-[#f3d24f] pl-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                      <div className="grid gap-2">
+                        <div className="font-mono-custom text-[9px] uppercase tracking-[0.14em] text-[#858982]">{t.exampleSentence}</div>
+                        <p className="text-[15px] leading-relaxed text-[#3d4651]" data-testid="text-example">“{word.example}”</p>
+                        <p className="font-arabic text-[13px] leading-relaxed text-[#858982]" dir="rtl" data-testid="text-example-translation">{word.exampleTranslation}</p>
+                      </div>
+                      <PronunciationButtons text={word.example} label={language === 'ar' ? 'جملة المثال' : t.exampleSentence} testIdPrefix="button-pronounce-example" disabled={!revealed} />
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          ) : (
-            <button type="button" data-testid="button-reveal" onClick={onReveal} className="mt-9 flex items-center gap-2 border-b border-dashed border-[#9da398] pb-1 text-sm font-semibold text-[#5f675f] transition-colors hover:border-[#ef7657] hover:text-[#c14f39]">{t.tapToReveal} <ArrowRight size={15} /></button>
-          )}
-             </>
            )}
         </div>
         <div className="flex items-center justify-between border-t border-[#e4ded2] px-5 py-4 sm:px-9">
@@ -1344,7 +1385,7 @@ function StarredWordsView({ words, starred, reviewed, onToggleStar, onMarkReview
         <Flashcard
           word={current}
           revealed={revealed}
-          onReveal={() => setRevealed(true)}
+          onReveal={() => setRevealed((value) => !value)}
           onNext={next}
           onPrevious={previous}
           onShuffle={shuffle}
@@ -1406,9 +1447,8 @@ function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, starred, ma
   const goalPercent = Math.min(100, (reviewed.size / oxford3000.length) * 100);
   useEffect(() => { setRevealed(false); }, [current?.id]);
   useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.code === 'Space') { event.preventDefault(); setRevealed((value) => !value); }
-      if (event.key === 'ArrowRight') setCurrentIndex(Math.min(words.length - 1, currentIndex + 1));
+     const handleKey = (event: KeyboardEvent) => {
+       if (event.key === 'ArrowRight') setCurrentIndex(Math.min(words.length - 1, currentIndex + 1));
       if (event.key === 'ArrowLeft') setCurrentIndex(Math.max(0, currentIndex - 1));
     };
     window.addEventListener('keydown', handleKey);
@@ -1421,7 +1461,7 @@ function StudyHome({ words, currentIndex, setCurrentIndex, reviewed, starred, ma
   return (
     <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_280px]">
       <div>
-          <Flashcard word={current} revealed={revealed} onReveal={() => setRevealed(true)} onNext={next} onPrevious={previous} onShuffle={shuffle} current={currentIndex} total={words.length} isReviewed={reviewed.has(current.id)} onMarkReviewed={() => markReviewed(current.id)} onSaveWord={onSaveWord} isStarred={starred.has(current.id)} onToggleStar={() => onToggleStar(current.id)} />
+          <Flashcard word={current} revealed={revealed} onReveal={() => setRevealed((value) => !value)} onNext={next} onPrevious={previous} onShuffle={shuffle} current={currentIndex} total={words.length} isReviewed={reviewed.has(current.id)} onMarkReviewed={() => markReviewed(current.id)} onSaveWord={onSaveWord} isStarred={starred.has(current.id)} onToggleStar={() => onToggleStar(current.id)} />
          <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-[#9a9e94]" data-testid="text-keyboard-hint"><span className="rounded border border-[#d8d2c6] bg-[#fbf8f1] px-1.5 py-0.5 font-mono-custom text-[10px]">space</span> {t.keyboardHint} <span className="mx-1 text-[#c5c0b5]">·</span> <span className="rounded border border-[#d8d2c6] bg-[#fbf8f1] px-1.5 py-0.5 font-mono-custom text-[10px]">← →</span> {t.keyboardMove}</div>
       </div>
       <aside className="space-y-4">
@@ -1630,7 +1670,7 @@ function ReviewSession({ milestoneKey, dayCount, startDay, endDay, words, review
           <div className="mt-1 font-display text-2xl text-[#202a40]" data-testid="text-review-session-progress">{completedIds.size} <span className="font-sans text-xs text-[#71776f]">/ {words.length}</span></div>
         </div>
       </div>
-       <Flashcard word={currentWord} revealed={revealed} onReveal={() => setRevealed(true)} onNext={moveNext} onPrevious={movePrevious} onShuffle={shuffleCurrent} current={flashcardIndex} total={sessionWords.length} isReviewed={reviewed.has(currentWord.id)} onMarkReviewed={() => completeCard('got-it')} onSaveWord={onSaveWord} isStarred={starred.has(currentWord.id)} onToggleStar={() => onToggleStar(currentWord.id)} sessionActions={{ onGotIt: () => completeCard('got-it'), onReviewLater: () => completeCard('review-later') }} />
+        <Flashcard word={currentWord} revealed={revealed} onReveal={() => setRevealed((value) => !value)} onNext={moveNext} onPrevious={movePrevious} onShuffle={shuffleCurrent} current={flashcardIndex} total={sessionWords.length} isReviewed={reviewed.has(currentWord.id)} onMarkReviewed={() => completeCard('got-it')} onSaveWord={onSaveWord} isStarred={starred.has(currentWord.id)} onToggleStar={() => onToggleStar(currentWord.id)} sessionActions={{ onGotIt: () => completeCard('got-it'), onReviewLater: () => completeCard('review-later') }} />
       <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-[#9a9e94]" data-testid="text-review-session-status">{pendingReviewIds.size > 0 ? t.wordsToReview(pendingReviewIds.size) : t.reviewFreshMix}</div>
     </section>
   );
@@ -1920,7 +1960,7 @@ function AllDaysDetail({ dayNumber, words, reviewed, starred, onBack, onMarkRevi
                <Flashcard
                  word={currentWord}
                  revealed={revealed}
-                 onReveal={() => setRevealed(true)}
+                  onReveal={() => setRevealed((value) => !value)}
                  onNext={nextFlashcard}
                  onPrevious={previousFlashcard}
                  onShuffle={shuffleFlashcards}

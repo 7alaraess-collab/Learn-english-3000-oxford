@@ -69,6 +69,13 @@
   .animate-rise { animation: rise .55s cubic-bezier(.2,.8,.2,1) both; }
   .animate-fade { animation: fade .35s ease both; }
   .card-flip { animation: cardFlip .38s cubic-bezier(.2,.8,.2,1) both; }
+  .flashcard-scene { min-height: 340px; perspective: 1400px; outline: none; }
+  .flashcard-scene:focus-visible { border-radius: 18px; box-shadow: 0 0 0 3px hsl(184 67% 31% / .2); }
+  .flashcard-rotor { position: relative; min-height: 340px; transform-style: preserve-3d; transition: transform .72s cubic-bezier(.22,.76,.24,1); will-change: transform; }
+  .flashcard-scene.is-flipped .flashcard-rotor { transform: rotateY(180deg); }
+  .flashcard-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+  .flashcard-scene:not(.is-flipped) .flashcard-back, .flashcard-scene.is-flipped .flashcard-front { pointer-events: none; }
+  .flashcard-back { transform: rotateY(180deg); }
   .animate-celebrate { animation: celebrate .7s cubic-bezier(.2,.8,.2,1) both; }
   .celebration-orbit { position: absolute; border: 1px solid rgba(36,99,95,.15); border-radius: 999px; pointer-events: none; }
   .celebration-orbit-one { width: 320px; height: 320px; top: -150px; left: -130px; animation: orbit 7s ease-in-out infinite; }
@@ -89,6 +96,7 @@
   @keyframes orbit { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(10px, 8px) rotate(7deg); } }
   @media (prefers-reduced-motion: reduce) {
     .animate-rise, .animate-fade, .card-flip, .animate-celebrate, .celebration-orbit { animation: none !important; }
+    .flashcard-rotor { transition: none !important; }
   }
  }
 
