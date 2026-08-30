@@ -74,6 +74,7 @@ const levelOptions = ['All levels', 'A1', 'A2', 'B1', 'B2'];
 const typeOptions = ['All parts', 'Noun', 'Verb', 'Adjective', 'Adverb', 'Preposition'];
 const reviewedStorageKey = 'wordroom-reviewed';
 const reviewDatesStorageKey = 'wordroom-review-dates';
+const completedDaysStorageKey = 'wordroom-completed-days';
 const dailyGoal = 12;
 const overridesStorageKey = 'wordroom-word-overrides';
 
@@ -691,6 +692,22 @@ function readReviewDates(userId?: string) {
     return Object.fromEntries(Object.entries(saved).filter(([, date]) => typeof date === 'string')) as Record<string, string>;
   } catch {
     return {};
+  }
+}
+
+function readCompletedDayNumbers(userId?: string) {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(getStorageKey(completedDaysStorageKey, userId)) ?? '[]') as unknown;
+    if (!Array.isArray(saved)) return new Set<number>();
+    const totalDays = Math.ceil(sourceWords.length / wordsPerDay);
+    return new Set(saved.filter((day): day is number => (
+      typeof day === 'number'
+      && Number.isInteger(day)
+      && day >= 1
+      && day <= totalDays
+    )));
+  } catch {
+    return new Set<number>();
   }
 }
 
@@ -1459,18 +1476,29 @@ function Home() {
     if (userId) {
       const mergedReviewed = new Set([...readReviewedIds(userId), ...readReviewedIds()]);
       const mergedReviewDates = { ...readReviewDates(userId), ...readReviewDates() };
+      const mergedCompletedDays = new Set([
+        ...readCompletedDayNumbers(userId),
+        ...readCompletedDayNumbers(),
+        ...getCompletedDayNumbers(days, mergedReviewed),
+      ]);
       setReviewed(mergedReviewed);
       setReviewDates(mergedReviewDates);
-      setCompletedDays(new Set(getCompletedDayNumbers(days, mergedReviewed)));
+      setCompletedDays(mergedCompletedDays);
       window.localStorage.setItem(getStorageKey(reviewedStorageKey, userId), JSON.stringify([...mergedReviewed]));
       window.localStorage.setItem(getStorageKey(reviewDatesStorageKey, userId), JSON.stringify(mergedReviewDates));
+      window.localStorage.setItem(getStorageKey(completedDaysStorageKey, userId), JSON.stringify([...mergedCompletedDays].sort((a, b) => a - b)));
       window.localStorage.removeItem(reviewedStorageKey);
       window.localStorage.removeItem(reviewDatesStorageKey);
+      window.localStorage.removeItem(completedDaysStorageKey);
     } else {
       const guestReviewed = readReviewedIds();
+      const guestCompletedDays = readCompletedDayNumbers();
       setReviewed(guestReviewed);
       setReviewDates(readReviewDates());
-      setCompletedDays(new Set(getCompletedDayNumbers(days, guestReviewed)));
+      setCompletedDays(new Set([
+        ...guestCompletedDays,
+        ...getCompletedDayNumbers(days, guestReviewed),
+      ]));
     }
   }, [authLoaded, isSignedIn, user?.id, days]);
 
@@ -1482,6 +1510,7 @@ function Home() {
     const mergedReviewed = new Set([...reviewed, ...serverReviewed]);
     const mergedCompletedDays = new Set([
       ...progressQuery.data.completedDayNumbers,
+      ...readCompletedDayNumbers(user.id),
       ...getCompletedDayNumbers(days, mergedReviewed),
     ]);
     setReviewed(mergedReviewed);
@@ -1495,7 +1524,8 @@ function Home() {
     const userId = isSignedIn ? user?.id : undefined;
     window.localStorage.setItem(getStorageKey(reviewedStorageKey, userId), JSON.stringify([...reviewed].sort((a, b) => a - b)));
     window.localStorage.setItem(getStorageKey(reviewDatesStorageKey, userId), JSON.stringify(reviewDates));
-  }, [authLoaded, isSignedIn, user?.id, reviewed, reviewDates]);
+    window.localStorage.setItem(getStorageKey(completedDaysStorageKey, userId), JSON.stringify([...completedDays].sort((a, b) => a - b)));
+  }, [authLoaded, isSignedIn, user?.id, reviewed, reviewDates, completedDays]);
 
   useEffect(() => {
     if (!authLoaded || !isSignedIn || !user?.id || progressQuery.isLoading || !progressQuery.data || hydratedUserRef.current !== user.id) return;
@@ -1528,7 +1558,7 @@ function Home() {
       const next = new Set(existing);
       next.add(id);
       const completedDayNumbers = getCompletedDayNumbers(days, next);
-      setCompletedDays(new Set(completedDayNumbers));
+      setCompletedDays((existingDays) => new Set([...existingDays, ...completedDayNumbers]));
       return next;
     });
     setReviewDates((existing) => {
@@ -1553,6 +1583,7 @@ function Home() {
     const userId = isSignedIn ? user?.id : undefined;
     window.localStorage.removeItem(getStorageKey(reviewedStorageKey, userId));
     window.localStorage.removeItem(getStorageKey(reviewDatesStorageKey, userId));
+    window.localStorage.removeItem(getStorageKey(completedDaysStorageKey, userId));
   };
   return (
      <div className="app-shell paper-grain min-h-[100dvh] bg-[#f6f2e9]">
