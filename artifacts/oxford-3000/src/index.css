@@ -149,155 +149,79 @@
 .dark [class~="shadow-[0_14px_34px_rgba(31,41,55,.08)]"] { box-shadow: 0 14px 34px rgb(0 0 0 / .2) !important; }
 .dark .theme-toggle { border-color: var(--app-border) !important; background-color: var(--app-surface) !important; color: var(--app-muted) !important; }
 
-/* رحلة الإنجاز — a long, tactile progress staircase. The map intentionally
-   keeps its horizontal rhythm on small screens so every day remains a
-   reachable, legible step rather than a compressed dot. */
-.journey-scroll {
-  scrollbar-color: var(--app-teal) var(--app-subtle);
-  scrollbar-width: thin;
+
+/* رحلة الإنجاز — a compact vertical journey tracker that complements the
+   full day grid without replacing it. */
+.journey-sidebar-map {
+  height: 520px;
+  overflow: hidden;
 }
-.journey-scroll::-webkit-scrollbar { height: 9px; }
-.journey-scroll::-webkit-scrollbar-track { background: var(--app-subtle); border-radius: 999px; }
-.journey-scroll::-webkit-scrollbar-thumb { background: var(--app-teal); border: 2px solid var(--app-subtle); border-radius: 999px; }
-.journey-track {
-  --step-width: 32px;
-  --step-gap: 8px;
-  position: relative;
-  width: 9992px;
-  min-width: 100%;
-  height: 438px;
-  background-image: linear-gradient(to right, hsl(36 20% 82% / .26) 1px, transparent 1px);
-  background-size: calc(var(--step-width) + var(--step-gap)) 100%;
-}
-.journey-track::after {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  right: 0;
-  bottom: 33px;
-  left: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--app-coral), var(--app-yellow) 28%, var(--app-teal) 66%, var(--app-teal));
-  opacity: .55;
-}
-.journey-step {
-  position: absolute;
-  z-index: 1;
-  bottom: 35px;
-  width: var(--step-width);
-  height: var(--step-height);
-}
-.journey-step-button {
-  position: relative;
-  display: flex;
-  width: 100%;
-  height: 100%;
-  align-items: flex-start;
-  justify-content: center;
-  border: 1px solid hsl(36 20% 82% / .95);
-  border-bottom: 0;
-  border-radius: 10px 10px 3px 3px;
-  background: linear-gradient(180deg, hsl(42 42% 97% / .97), hsl(39 28% 89% / .88));
-  color: var(--app-ink);
-  box-shadow: 0 3px 0 hsl(36 20% 82% / .55);
-  cursor: pointer;
-  outline: none;
-  transition: transform .2s ease, border-color .2s ease, background-color .2s ease, box-shadow .2s ease;
-}
-.journey-step-button::before {
-  content: '';
+.journey-sidebar-line,
+.journey-sidebar-progress {
   position: absolute;
   top: 0;
-  right: 3px;
-  left: 3px;
-  height: 3px;
+  bottom: 0;
+  left: 50%;
   border-radius: 999px;
-  background: var(--app-yellow);
+  transform: translateX(-50%);
 }
-.journey-step-button:hover,
-.journey-step-button:focus-visible {
-  border-color: var(--app-teal);
-  box-shadow: 0 7px 0 hsl(184 67% 31% / .18);
-  transform: translateY(-5px);
+.journey-sidebar-line {
+  width: 3px;
+  top: 17px;
+  bottom: 17px;
+  background: linear-gradient(180deg, var(--app-coral), var(--app-yellow) 36%, var(--app-teal));
+  opacity: .28;
 }
-.journey-step-button:focus-visible { box-shadow: 0 0 0 3px hsl(184 67% 31% / .23), 0 7px 0 hsl(184 67% 31% / .18); }
-.journey-step-button.is-studied { background: linear-gradient(180deg, hsl(184 37% 91%), hsl(184 31% 83%)); border-color: hsl(184 31% 69%); }
-.journey-step-button.is-complete { background: linear-gradient(180deg, hsl(184 41% 84%), hsl(184 43% 69%)); border-color: var(--app-teal); }
-.journey-step-button.is-complete::before { background: var(--app-coral); }
-.journey-step-button.is-locked { background: linear-gradient(180deg, hsl(39 28% 89%), hsl(36 20% 82%)); border-color: hsl(36 15% 76%); cursor: not-allowed; }
-.journey-step-button.is-locked:hover,
-.journey-step-button.is-locked:focus-visible { border-color: hsl(36 15% 68%); box-shadow: 0 3px 0 hsl(36 20% 82% / .55); transform: none; }
-.journey-step-number {
-  display: block;
-  padding-top: 8px;
-  font-family: var(--app-font-mono);
-  font-size: 9px;
-  line-height: 1;
-  letter-spacing: -.04em;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
+.journey-sidebar-progress {
+  top: 17px;
+  right: auto;
+  bottom: auto;
+  width: 5px;
+  background: linear-gradient(180deg, var(--app-coral), var(--app-teal));
+  transition: height .8s cubic-bezier(.22,.76,.24,1);
 }
-.journey-step-mark {
+.journey-sidebar-marker {
   position: absolute;
-  right: 50%;
-  bottom: 8px;
-  display: grid;
-  width: 16px;
-  height: 16px;
-  place-items: center;
+  z-index: 2;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  border: 2px solid var(--app-surface);
   border-radius: 50%;
-  background: hsl(42 42% 97% / .75);
-  color: var(--app-teal);
-  transform: translateX(50%);
+  background: var(--app-faint);
+  transform: translate(-50%, -50%);
 }
-.journey-plane {
+.journey-sidebar-marker.is-studied { background: var(--app-teal); }
+.journey-sidebar-marker.is-complete { width: 9px; height: 9px; background: var(--app-coral); border-color: var(--app-coral); }
+.journey-sidebar-marker.is-locked { background: var(--app-border); }
+.journey-sidebar-plane {
   position: absolute;
   z-index: 3;
+  top: 0;
+  left: 50%;
   display: grid;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   place-items: center;
   border: 1px solid var(--app-coral);
   border-radius: 50%;
   background: var(--app-surface);
   color: var(--app-coral);
   box-shadow: 0 5px 12px hsl(17 77% 58% / .2);
-  transform-origin: center;
+  transform: translate(-50%, -50%);
+  transition: top .8s cubic-bezier(.22,.76,.24,1);
 }
-.journey-plane.is-traveling { animation: journey-plane-travel .7s cubic-bezier(.2,.8,.2,1) both; }
-.journey-chapter {
-  position: absolute;
-  bottom: 9px;
-  z-index: 2;
-  color: var(--app-faint);
-  font-family: var(--app-font-mono);
-  font-size: 9px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.dark .journey-track { background-image: linear-gradient(to right, hsl(223 25% 27% / .42) 1px, transparent 1px); }
-.dark .journey-step-button {
-  border-color: var(--app-border);
-  background: linear-gradient(180deg, var(--app-surface), var(--app-subtle));
-  box-shadow: 0 3px 0 hsl(223 25% 10% / .45);
-}
-.dark .journey-step-button.is-studied { border-color: #4e8f82; background: color-mix(in srgb, var(--app-teal) 24%, var(--app-surface)); }
-.dark .journey-step-button.is-complete { border-color: var(--app-teal); background: color-mix(in srgb, var(--app-teal) 34%, var(--app-surface)); }
-.dark .journey-step-button.is-locked { border-color: var(--app-border); background: linear-gradient(180deg, var(--app-subtle), var(--app-input)); }
-.dark .journey-step-mark { background: color-mix(in srgb, var(--app-surface) 80%, transparent); }
-.dark .journey-plane { border-color: var(--app-coral); background: var(--app-surface); }
-@keyframes journey-plane-travel {
-  from { opacity: .45; transform: translateX(var(--plane-offset)) translateY(calc(var(--plane-y-offset) + 10px)) rotate(-10deg); }
-  to { opacity: 1; transform: translateX(0) translateY(0) rotate(0deg); }
-}
-@media (max-width: 767px) {
-  .journey-track { height: 368px; }
-  .journey-step { bottom: 35px; }
-  .journey-step-number { font-size: 8px; }
+.journey-sidebar-plane.is-traveling { animation: journey-plane-flight .8s cubic-bezier(.2,.8,.2,1) both; }
+.dark .journey-sidebar { background: var(--app-input); }
+.dark .journey-sidebar-marker { border-color: var(--app-input); }
+.dark .journey-sidebar-plane { background: var(--app-surface); }
+@keyframes journey-plane-flight {
+  0% { opacity: .65; transform: translate(-50%, -50%) rotate(-10deg) scale(.92); }
+  50% { opacity: 1; transform: translate(-50%, calc(-50% - 5px)) rotate(4deg) scale(1.06); }
+  100% { opacity: 1; transform: translate(-50%, -50%) rotate(0deg) scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .journey-step-button { transition: none; }
-  .journey-step-button:hover, .journey-step-button:focus-visible { transform: none; }
-  .journey-plane.is-traveling { animation: none !important; }
+  .journey-sidebar-progress,
+  .journey-sidebar-plane { transition: none; }
+  .journey-sidebar-plane.is-traveling { animation: none !important; }
 }

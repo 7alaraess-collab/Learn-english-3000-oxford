@@ -1,4 +1,4 @@
-import { createContext, type CSSProperties, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
 import { arSA } from '@clerk/localizations';
@@ -1778,103 +1778,114 @@ function AllDaysOverview({ days, reviewed, completedDays, reviewMilestones, onSe
   const nextUnlockedDay = getNextUnlockedDay(studiedDays, reviewMilestones, days.length);
   const progressionDay = Math.max(1, Math.min(nextUnlockedDay, days.length));
   const previousProgressionDay = useRef(progressionDay);
-  const [planeTravel, setPlaneTravel] = useState<{ from: number; to: number } | null>(null);
-  const stepHeight = (dayNumber: number) => {
-    const ratio = (dayNumber - 1) / Math.max(days.length - 1, 1);
-    return Math.round(42 + ratio * 280);
-  };
+  const [planeTravel, setPlaneTravel] = useState(false);
   useEffect(() => {
     const previousDay = previousProgressionDay.current;
     if (previousDay === progressionDay) return;
-    setPlaneTravel({ from: previousDay, to: progressionDay });
     previousProgressionDay.current = progressionDay;
-    const timer = window.setTimeout(() => setPlaneTravel(null), 760);
+    setPlaneTravel(true);
+    const timer = window.setTimeout(() => setPlaneTravel(false), 800);
     return () => window.clearTimeout(timer);
   }, [progressionDay]);
-  const planeLeft = (progressionDay - 1) * 40;
-  const planeBottom = 35 + stepHeight(progressionDay) + 10;
-  const planeOffset = planeTravel ? (planeTravel.from - planeTravel.to) * 40 : 0;
-  const planeVerticalOffset = planeTravel ? planeBottom - (35 + stepHeight(planeTravel.from) + 10) : 0;
-  const chapterDays = [1, 50, 100, 150, 200, 250].filter((day) => day <= days.length);
+  const progressPercent = ((progressionDay - 1) / Math.max(days.length - 1, 1)) * 100;
+  const mapProgressPercent = progressPercent * 0.9346;
+  const mapPosition = `calc(17px + ${mapProgressPercent}%)`;
   return (
     <section className="animate-rise" data-testid="section-all-days">
       <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
         <div>
           <div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.21em] text-[#24635f]"><span className="h-2 w-2 rounded-full bg-[#ef7657]" /> {t.steadyPath}</div>
-          <h1 className="mt-3 max-w-[680px] font-display text-[clamp(2.6rem,5.3vw,4.7rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-all-days">{t.allDaysTitle} <em className="text-[#24635f]">{t.journeyName}</em></h1>
+          <h1 className="mt-3 max-w-[680px] font-display text-[clamp(2.6rem,5.3vw,4.7rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-all-days">{t.allDaysTitle} <em className="text-[#24635f]">{t.steadyRhythm}</em></h1>
           <p className="mt-4 max-w-[510px] text-[14px] leading-relaxed text-[#71776f]">{t.vocabularyJourney}</p>
         </div>
         <div className={language === 'ar' ? 'text-right md:text-left' : 'text-left md:text-right'}>
            <div className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">{t.dailyMap}</div>
-           <div className="mt-1 font-display text-[31px] leading-none text-[#202a40]" data-testid="text-all-days-count">{days.length} <span className="font-sans text-sm font-medium text-[#71776f]">{t.days}</span></div>
+           <div className="mt-1 font-display text-[31px] leading-none text-[#202a40]">{days.length} <span className="font-sans text-sm font-medium text-[#71776f]">{t.days}</span></div>
         </div>
       </div>
-       <div className="mt-8 overflow-hidden rounded-[26px] border border-[#d4cec0] bg-[#f6f2e9] shadow-[0_14px_34px_rgba(31,41,55,.06)]" data-testid="panel-progress-staircase">
-         <div className="flex flex-col justify-between gap-4 border-b border-[#e4ded2] px-5 py-4 sm:flex-row sm:items-center sm:px-7">
-           <div className="flex items-center gap-3">
-             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#202a40] text-[#f9f5e9]"><Plane size={16} aria-hidden="true" /></div>
-             <div>
-               <div className="font-mono-custom text-[10px] uppercase tracking-[.16em] text-[#858982]">{t.progress}</div>
-               <div className="mt-0.5 text-sm font-semibold text-[#202a40]" data-testid="status-journey-current">{t.dayLabel(progressionDay)}</div>
-             </div>
-           </div>
-           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono-custom text-[9px] uppercase tracking-[.1em] text-[#71776f]" aria-label={t.progress}>
-             <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#24635f]" /> {t.reviewed}</span>
-             <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#ef7657]" /> {t.complete}</span>
-             <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#b7b8b0]" /> {t.locked}</span>
-           </div>
-         </div>
-         <div className="journey-scroll overflow-x-auto overflow-y-hidden px-5 pb-5 pt-8 sm:px-7" role="region" aria-label={t.journeyName} tabIndex={0} data-testid="region-progress-staircase">
-           <div className="journey-track">
-             {chapterDays.map((chapterDay) => (
-               <div key={chapterDay} className="journey-chapter" style={{ left: `${(chapterDay - 1) * 40}px` }} data-testid={`text-journey-chapter-${chapterDay}`}>
-                 {t.dayLabel(chapterDay)}
-               </div>
-             ))}
-             <div
-               className={`journey-plane ${planeTravel ? 'is-traveling' : ''}`}
-               style={{ left: `${planeLeft}px`, bottom: `${planeBottom}px`, '--plane-offset': `${planeOffset}px`, '--plane-y-offset': `${planeVerticalOffset}px` } as CSSProperties}
-               role="img"
-               aria-label={`${t.progress}: ${t.dayLabel(progressionDay)}`}
-               data-testid="icon-journey-plane"
-             >
-               <Plane size={15} strokeWidth={2.4} aria-hidden="true" />
-             </div>
-             {days.map((dayWords, dayIndex) => {
-               const dayNumber = dayIndex + 1;
-               const reviewedCount = dayWords.filter((word) => reviewed.has(word.id)).length;
-               const isLocked = dayNumber > nextUnlockedDay;
-               const isStudied = studiedDays.has(dayNumber) || completedDays.has(dayNumber);
-               const hasProgress = reviewedCount > 0;
-               const isComplete = !isLocked && fullyCompletedDays.has(dayNumber);
-               const statusLabel = isComplete ? t.complete : isLocked ? t.locked : isStudied ? t.reviewed : t.progress;
-               const firstWord = dayWords[0]?.word ?? '';
-               const lastWord = dayWords[dayWords.length - 1]?.word ?? '';
-               return (
-                 <div key={dayIndex} className="journey-step" style={{ left: `${dayIndex * 40}px`, '--step-height': `${stepHeight(dayNumber)}px` } as CSSProperties}>
-                   <button
-                     type="button"
-                     data-testid={`button-all-days-day-${dayNumber}`}
-                     aria-disabled={isLocked}
-                     aria-label={`${t.dayLabel(dayNumber)} — ${statusLabel}. ${t.wordsCount(dayWords.length)}. ${firstWord} ${t.to} ${lastWord}`}
-                     title={`${t.dayLabel(dayNumber)} — ${statusLabel}`}
-                     onClick={() => isLocked ? onBlockedDay(dayNumber) : onSelectDay(dayIndex)}
-                     className={`journey-step-button ${isLocked ? 'is-locked' : isComplete ? 'is-complete' : isStudied || hasProgress ? 'is-studied' : ''}`}
-                   >
-                     <span className="journey-step-number" aria-hidden="true">{dayNumber}</span>
-                     <span className="journey-step-mark" aria-hidden="true">
-                       {isComplete ? <Check size={10} strokeWidth={3} /> : isLocked ? <Lock size={9} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
-                     </span>
-                   </button>
-                 </div>
-               );
-             })}
-           </div>
-         </div>
-         <div className="flex items-center justify-between border-t border-[#e4ded2] px-5 py-3 font-mono-custom text-[9px] uppercase tracking-[.12em] text-[#858982] sm:px-7">
-           <span>{t.dailySet}</span>
-           <span>{t.wordsCount(wordsPerDay)} <span className="mx-1 text-[#c6bfb1]">/</span> {days.length} {t.days}</span>
-         </div>
+      <div className="mt-9 grid gap-7 xl:grid-cols-[minmax(0,1fr)_220px] xl:items-start">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {days.map((dayWords, dayIndex) => {
+            const dayNumber = dayIndex + 1;
+            const reviewedCount = dayWords.filter((word) => reviewed.has(word.id)).length;
+            const isLocked = dayNumber > nextUnlockedDay;
+            const isStudied = studiedDays.has(dayNumber) || completedDays.has(dayNumber);
+            const isComplete = !isLocked && fullyCompletedDays.has(dayNumber);
+            const firstWord = dayWords[0]?.word ?? '';
+            const lastWord = dayWords[dayWords.length - 1]?.word ?? '';
+            return (
+              <button
+                type="button"
+                key={dayIndex}
+                data-testid={`button-all-days-day-${dayNumber}`}
+                aria-disabled={isLocked}
+                onClick={() => isLocked ? onBlockedDay(dayNumber) : onSelectDay(dayIndex)}
+                className={`group relative overflow-hidden rounded-2xl border border-[#ded8ca] bg-[#fbf8f1] p-5 shadow-[0_2px_5px_rgba(31,41,55,.03)] transition-all duration-200 ${isLocked ? 'cursor-not-allowed opacity-65' : 'hover:-translate-y-1 hover:border-[#24635f] hover:shadow-[0_10px_22px_rgba(31,41,55,.08)]'} ${language === 'ar' ? 'text-right' : 'text-left'}`}
+              >
+                <div className="absolute right-0 top-0 h-1 w-14 bg-[#f3d24f] transition-all duration-200 group-hover:w-24" />
+                <div className="flex items-center justify-between">
+                  <span className="font-mono-custom text-[10px] uppercase tracking-[.17em] text-[#858982]">{t.dailySet}</span>
+                  {isComplete ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#d9eee9] px-2 py-1 font-mono-custom text-[9px] uppercase tracking-[.08em] text-[#24635f]"><Check size={11} /> {t.complete}</span>
+                  ) : isLocked ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#e9e3d7] px-2 py-1 font-mono-custom text-[9px] uppercase tracking-[.08em] text-[#858982]"><Lock size={10} /> {t.locked}</span>
+                  ) : (
+                    <ArrowRight size={15} className="text-[#b7b8b0] transition-transform group-hover:translate-x-1 group-hover:text-[#ef7657]" />
+                  )}
+                </div>
+                <div className="mt-5 flex items-end justify-between gap-3">
+                  <h2 className="font-display text-[29px] leading-none tracking-[-.04em] text-[#202a40]">{t.dayLabel(dayNumber)}</h2>
+                  <span className="rounded-full bg-[#e9e3d7] px-2.5 py-1 font-mono-custom text-[9px] text-[#666d65]">{t.wordsCount(dayWords.length)}</span>
+                </div>
+                <p className="mt-4 truncate text-xs text-[#71776f]" title={`${firstWord} — ${lastWord}`}>{firstWord} <span className="text-[#c6bfb1]">{t.to}</span> {lastWord}</p>
+                <div className="mt-5 flex items-center gap-3 border-t border-[#e8e2d7] pt-4">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e9e3d7]">
+                    <div className="h-full rounded-full bg-[#24635f] transition-all duration-500" style={{ width: `${dayWords.length ? (reviewedCount / dayWords.length) * 100 : 0}%` }} />
+                  </div>
+                  <span className="font-mono-custom text-[10px] text-[#858982]">{reviewedCount}/{dayWords.length}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <aside className="journey-sidebar rounded-[24px] border border-[#d4cec0] bg-[#f6f2e9] p-5 shadow-[0_10px_26px_rgba(31,41,55,.06)] xl:sticky xl:top-6" data-testid="panel-journey-sidebar">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="font-mono-custom text-[10px] uppercase tracking-[.17em] text-[#858982]">{t.journeyName}</div>
+              <div className="mt-1 text-sm font-semibold text-[#202a40]" data-testid="status-journey-current">{t.dayLabel(progressionDay)}</div>
+            </div>
+            <div className="grid h-9 w-9 place-items-center rounded-full bg-[#202a40] text-[#f9f5e9]"><Plane size={16} aria-hidden="true" /></div>
+          </div>
+          <div className="mt-5 flex items-center justify-between font-mono-custom text-[9px] uppercase tracking-[.12em] text-[#858982]">
+            <span>{t.dayLabel(1)}</span>
+            <span>{t.dayLabel(days.length)}</span>
+          </div>
+          <div className="journey-sidebar-map relative mt-2" role="img" aria-label={`${t.journeyName}: ${t.dayLabel(progressionDay)}`} data-testid="region-journey-sidebar">
+            <div className="journey-sidebar-line" />
+            <div className="journey-sidebar-progress" style={{ height: `${mapProgressPercent}%` }} />
+            {days.map((_dayWords, dayIndex) => {
+              const dayNumber = dayIndex + 1;
+              const isLocked = dayNumber > nextUnlockedDay;
+              const isComplete = !isLocked && fullyCompletedDays.has(dayNumber);
+              const isStudied = studiedDays.has(dayNumber) || completedDays.has(dayNumber);
+              return (
+                <span
+                  key={dayNumber}
+                  className={`journey-sidebar-marker ${isComplete ? 'is-complete' : isLocked ? 'is-locked' : isStudied ? 'is-studied' : ''}`}
+                  style={{ top: `calc(17px + ${(((dayNumber - 1) / Math.max(days.length - 1, 1)) * 100 * 0.9346)}%)` }}
+                  aria-hidden="true"
+                />
+              );
+            })}
+            <div className={`journey-sidebar-plane ${planeTravel ? 'is-traveling' : ''}`} style={{ top: mapPosition }} role="img" aria-label={`${t.progress}: ${t.dayLabel(progressionDay)}`} data-testid="icon-journey-plane">
+              <Plane size={14} strokeWidth={2.4} aria-hidden="true" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center justify-between border-t border-[#e4ded2] pt-4 font-mono-custom text-[9px] uppercase tracking-[.1em] text-[#71776f]">
+            <span>{t.progress}</span>
+            <span>{progressionDay}/{days.length}</span>
+          </div>
+        </aside>
       </div>
     </section>
   );
