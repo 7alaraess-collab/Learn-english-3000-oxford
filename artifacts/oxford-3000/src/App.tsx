@@ -825,10 +825,10 @@ function Sidebar({ view, setView, mobileOpen, closeMobile, onReset, reviewedToda
              <div className="h-full rounded-full bg-[#ef7657] transition-all duration-500" style={{ width: `${Math.min(100, (reviewedToday / dailyGoal) * 100)}%` }} />
           </div>
             <p className="mt-3 text-xs leading-relaxed text-[#aab3bd]">{reviewedToday >= dailyGoal ? t.dailyRhythmComplete : t.dailyWordsLeft(dailyGoal - reviewedToday)}</p>
-           <button type="button" data-testid="button-reset-all-data" onClick={onReset} className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#dce1dc] transition-colors hover:text-[#f3d24f]">
-              <RotateCcw size={12} /> {t.resetAllData}
-          </button>
         </div>
+         <button type="button" data-testid="button-reset-all-data" onClick={onReset} className="mt-4 inline-flex items-center gap-1.5 self-start px-2 text-[11px] font-semibold text-[#84909f] transition-colors hover:text-[#f3d24f]">
+           <RotateCcw size={12} /> {t.resetAllData}
+         </button>
          <div className="mt-5 flex items-center gap-2 px-2 text-[11px] text-[#84909f]"><Command size={12} /> <span>{t.builtForLongGame}</span></div>
       </aside>
     </>
