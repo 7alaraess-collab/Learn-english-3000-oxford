@@ -1322,6 +1322,24 @@ function getReviewBlocks(totalDays: number): ReviewBlock[] {
   return blocks;
 }
 
+function getRequiredReviewBlockForDay(dayNumber: number, totalDays: number) {
+  const blocks = getReviewBlocks(totalDays);
+  const exactEndDay = Math.ceil(dayNumber / 3) * 3;
+  return blocks.find((block) => block.endDay === exactEndDay) ?? blocks[blocks.length - 1];
+}
+
+function getFullyCompletedDayNumbers(days: EditableWord[][], reviewed: Set<number>, reviewMilestones: Record<string, string>) {
+  const studiedDays = new Set(getCompletedDayNumbers(days, reviewed));
+  return days.reduce<number[]>((completed, _dayWords, dayIndex) => {
+    const dayNumber = dayIndex + 1;
+    const requiredReview = getRequiredReviewBlockForDay(dayNumber, days.length);
+    if (studiedDays.has(dayNumber) && requiredReview && reviewMilestones[requiredReview.key]) {
+      completed.push(dayNumber);
+    }
+    return completed;
+  }, []);
+}
+
 function getReviewWordsForBlock(days: EditableWord[][], block: ReviewBlock, avoidSignature?: string) {
   const reviewDaySets = Array.from(
     { length: block.dayCount },
@@ -1366,29 +1384,17 @@ function ReviewMilestoneCard({ block, words, completed, locked, onStart }: { blo
   const { t } = useLanguage();
   const isReady = !locked && words.length > 0;
   const title = block.dayCount === 3 ? t.reviewThreeDay : t.reviewSixDay;
-  const description = block.dayCount === 3 ? t.reviewThreeDayDescription : t.reviewSixDayDescription;
   return (
     <article className={`group relative overflow-hidden rounded-[26px] border p-6 transition-all duration-300 sm:p-8 ${locked ? 'border-[#ded8ca] bg-[#eeeae1] opacity-75' : block.dayCount === 3 ? 'border-[#d4cec0] bg-[#fbf8f1] hover:-translate-y-1 hover:border-[#24635f] hover:shadow-[0_16px_34px_rgba(31,41,55,.09)]' : 'border-[#d9cfae] bg-[#f5edda] hover:-translate-y-1 hover:border-[#b99a43] hover:shadow-[0_16px_34px_rgba(125,91,25,.1)]'}`} data-testid={`card-review-milestone-${block.dayCount}-${block.endDay}`}>
       <div className={`absolute inset-x-0 top-0 h-1 ${locked ? 'bg-[#b7b8b0]' : block.dayCount === 3 ? 'bg-[#24635f]' : 'bg-[#ef7657]'}`} />
       <div className="flex items-start justify-between gap-4">
         <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${locked ? 'bg-[#e1ddd3] text-[#858982]' : block.dayCount === 3 ? 'bg-[#d9eee9] text-[#24635f]' : 'bg-[#f8e7ba] text-[#a04b39]'}`}><span className="font-display text-[25px] leading-none">{block.dayCount}</span></div>
-        {completed ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#d9eee9] px-2.5 py-1.5 font-mono-custom text-[9px] uppercase tracking-[.1em] text-[#24635f]" data-testid={`status-review-complete-${block.dayCount}-${block.endDay}`}><Check size={11} /> {t.reviewReplayUnlocked}</span>
-        ) : locked ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#e1ddd3] px-2.5 py-1.5 font-mono-custom text-[9px] uppercase tracking-[.1em] text-[#858982]"><Lock size={11} /> {t.locked}</span>
-        ) : null}
       </div>
       <div className="mt-8">
-        <div className="font-mono-custom text-[10px] uppercase tracking-[.18em] text-[#858982]">{t.reviewDeskLabel}</div>
         <h2 className="mt-2 font-display text-[clamp(2rem,4vw,3rem)] leading-none tracking-[-.05em] text-[#202a40]">{title}</h2>
         <div className="mt-2 font-mono-custom text-[10px] uppercase tracking-[.14em] text-[#24635f]">{t.reviewBlockDays(block.startDay, block.endDay)}</div>
-        <p className="mt-3 max-w-[360px] text-sm leading-relaxed text-[#71776f]">{description}</p>
       </div>
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-[#e4ded2] pt-5">
-        <div>
-          <div className="font-mono-custom text-[10px] uppercase tracking-[.14em] text-[#858982]" data-testid={`text-review-word-count-${block.dayCount}-${block.endDay}`}>{locked ? t.reviewLockedDescription : t.reviewWordsReady(words.length)}</div>
-          {!locked && <div className="mt-1 text-xs font-semibold text-[#24635f]">{t.reviewFreshMix}</div>}
-        </div>
+      <div className="mt-8 flex justify-end border-t border-[#e4ded2] pt-5">
         <button type="button" data-testid={`button-start-review-${block.dayCount}-${block.endDay}`} aria-disabled={locked} disabled={!isReady} onClick={onStart} className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-45 ${locked ? 'bg-[#b7b8b0] text-[#f6f2e9]' : block.dayCount === 3 ? 'bg-[#202a40] text-[#f9f5e9] hover:-translate-y-0.5 hover:bg-[#2c3852]' : 'bg-[#ef7657] text-[#fff8ee] hover:-translate-y-0.5 hover:bg-[#c95b43]'}`}>
           {locked ? t.locked : completed ? t.reviewAgain : t.reviewStart} <ArrowRight size={14} />
         </button>
@@ -1490,7 +1496,8 @@ function ReviewView({ days, completedDays, reviewMilestones, reviewed, onMarkRev
   const { language, t } = useLanguage();
   const [activeSession, setActiveSession] = useState<{ block: ReviewBlock; words: EditableWord[] } | null>(null);
   const previousMixSignaturesRef = useRef<Record<string, string>>({});
-  const completedDayCount = getContiguousCompletedDayCount(completedDays, days.length);
+  const studiedDays = new Set(getCompletedDayNumbers(days, reviewed));
+  const completedDayCount = getContiguousCompletedDayCount(studiedDays, days.length);
   const reviewBlocks = getReviewBlocks(days.length);
   const getFreshReviewWords = (block: ReviewBlock) => {
     const words = getReviewWordsForBlock(days, block, previousMixSignaturesRef.current[block.key]);
@@ -1549,7 +1556,9 @@ function ReviewView({ days, completedDays, reviewMilestones, reviewed, onMarkRev
 
 function AllDaysOverview({ days, reviewed, completedDays, reviewMilestones, onSelectDay, onBlockedDay }: { days: EditableWord[][]; reviewed: Set<number>; completedDays: Set<number>; reviewMilestones: Record<string, string>; onSelectDay: (dayIndex: number) => void; onBlockedDay: (dayNumber: number) => void }) {
   const { language, t } = useLanguage();
-  const nextUnlockedDay = getNextUnlockedDay(completedDays, reviewMilestones, days.length);
+  const studiedDays = new Set(getCompletedDayNumbers(days, reviewed));
+  const fullyCompletedDays = new Set(getFullyCompletedDayNumbers(days, reviewed, reviewMilestones));
+  const nextUnlockedDay = getNextUnlockedDay(studiedDays, reviewMilestones, days.length);
   return (
     <section className="animate-rise" data-testid="section-all-days">
       <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
@@ -1567,7 +1576,8 @@ function AllDaysOverview({ days, reviewed, completedDays, reviewMilestones, onSe
         {days.map((dayWords, dayIndex) => {
           const reviewedCount = dayWords.filter((word) => reviewed.has(word.id)).length;
            const isLocked = dayIndex + 1 > nextUnlockedDay;
-          const isComplete = !isLocked && (completedDays.has(dayIndex + 1) || (dayWords.length > 0 && reviewedCount === dayWords.length));
+          const isStudied = studiedDays.has(dayIndex + 1);
+          const isComplete = !isLocked && fullyCompletedDays.has(dayIndex + 1);
           const firstWord = dayWords[0]?.word ?? '';
           const lastWord = dayWords[dayWords.length - 1]?.word ?? '';
           return (
@@ -1870,9 +1880,9 @@ function Home() {
   }, [mobileOpen]);
   const today = localDateKey();
   const reviewedToday = Object.values(reviewDates).filter((date) => date === today).length;
-  const currentStreak = getCurrentStreak(completedDays);
   const editableWords = useMemo(() => sourceWords.map((word) => ({ ...word, ...(wordOverrides[word.id] ?? {}) })), [wordOverrides]);
   const days = useMemo(() => splitIntoDays(editableWords), [editableWords]);
+  const currentStreak = getCurrentStreak(new Set(getFullyCompletedDayNumbers(days, reviewed, reviewMilestones)));
   useEffect(() => {
     if (!authLoaded) return;
     const userId = isSignedIn ? user?.id ?? null : null;
