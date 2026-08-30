@@ -100,6 +100,7 @@ const translations = {
     themeToggleLabel: 'Toggle color theme',
     lightMode: 'Light mode',
     darkMode: 'Dark mode',
+     openMenu: 'Open menu',
     closeMenu: 'Close menu',
     mainNavigation: 'Main navigation',
     yourDesk: 'Your desk',
@@ -240,6 +241,7 @@ const translations = {
     themeToggleLabel: 'تبديل مظهر الألوان',
     lightMode: 'الوضع الفاتح',
     darkMode: 'الوضع الداكن',
+     openMenu: 'فتح القائمة',
     closeMenu: 'إغلاق القائمة',
     mainNavigation: 'التنقل الرئيسي',
     yourDesk: 'مساحتك',
@@ -761,8 +763,19 @@ function Sidebar({ view, setView, mobileOpen, closeMobile, onReset, reviewedToda
   return (
     <>
       {mobileOpen && <button type="button" aria-label={t.closeMenu} data-testid="button-close-menu" onClick={closeMobile} className="fixed inset-0 z-30 bg-[#202a40]/35 md:hidden" />}
-      <aside className={`app-sidebar fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col bg-[#202a40] px-5 py-6 text-[#f9f5e9] transition-transform duration-300 md:translate-x-0 ${mobileOpen ? 'is-open translate-x-0' : '-translate-x-full'}`}>
-        <Logo />
+      <aside id="mobile-sidebar" aria-label={t.mainNavigation} className={`app-sidebar fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col bg-[#202a40] px-5 py-6 text-[#f9f5e9] transition-transform duration-300 md:translate-x-0 ${mobileOpen ? 'is-open translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex items-start justify-between gap-3">
+          <Logo />
+          <button
+            type="button"
+            aria-label={t.closeMenu}
+            data-testid="button-close-sidebar"
+            onClick={closeMobile}
+            className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#46536a] text-[#dce1dc] transition-colors hover:border-[#f3d24f] hover:bg-[#2c3852] hover:text-[#f3d24f] md:hidden"
+          >
+            <X size={19} strokeWidth={2} />
+          </button>
+        </div>
         <div className="mt-14">
           <div className="mb-3 px-3 font-mono-custom text-[9px] uppercase tracking-[0.2em] text-[#84909f]">{t.yourDesk}</div>
           <nav className="space-y-1" aria-label={t.mainNavigation}>
@@ -835,14 +848,14 @@ function AuthControls() {
   );
 }
 
-function TopBar({ view, setView, openMenu }: { view: AppView; setView: (view: AppView) => void; openMenu: () => void }) {
+function TopBar({ view, setView, openMenu, mobileOpen }: { view: AppView; setView: (view: AppView) => void; openMenu: () => void; mobileOpen: boolean }) {
   const { language, t, setLanguage } = useLanguage();
   const { theme, setTheme } = useTheme();
   const formattedDate = new Intl.DateTimeFormat(language === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
   return (
     <header className="app-topbar sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-[#ded8ca] bg-[#f6f2e9]/90 px-5 backdrop-blur-md md:ml-[264px] md:px-10">
       <div className="flex items-center gap-3">
-        <button type="button" data-testid="button-open-menu" onClick={openMenu} className="rounded-lg p-2 text-[#202a40] hover:bg-[#e9e3d7] md:hidden" aria-label={t.mainNavigation}><Menu size={20} /></button>
+        <button type="button" data-testid="button-open-menu" onClick={openMenu} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#d6d1c6] bg-[#fbf8f1] text-[#202a40] shadow-[0_2px_5px_rgba(31,41,55,.05)] transition-colors hover:border-[#24635f] hover:bg-[#e9e3d7] md:hidden" aria-label={t.openMenu} aria-controls="mobile-sidebar" aria-expanded={mobileOpen}><Menu size={20} strokeWidth={2.25} /></button>
         <div className="font-mono-custom text-[10px] uppercase tracking-[0.18em] text-[#858982]">{formattedDate}</div>
       </div>
       <div className="flex items-center gap-2">
@@ -1415,6 +1428,19 @@ function Home() {
   const [wordOverrides, setWordOverrides] = useState<Record<string, WordOverrides>>(readWordOverrides);
   const authUserRef = useRef<string | null | undefined>(undefined);
   const hydratedUserRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileOpen(false);
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [mobileOpen]);
   const today = localDateKey();
   const reviewedToday = Object.values(reviewDates).filter((date) => date === today).length;
   const currentStreak = getCurrentStreak(reviewDates);
@@ -1532,7 +1558,7 @@ function Home() {
   return (
      <div className="app-shell paper-grain min-h-[100dvh] bg-[#f6f2e9]">
       <Sidebar view={view} setView={navigate} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} onReset={resetSession} reviewedToday={reviewedToday} />
-      <TopBar view={view} setView={navigate} openMenu={() => setMobileOpen(true)} />
+      <TopBar view={view} setView={navigate} openMenu={() => setMobileOpen(true)} mobileOpen={mobileOpen} />
        <main className="app-main ml-0 px-5 pb-16 pt-9 md:ml-[264px] md:px-10 md:pt-12">
         <div className="mx-auto max-w-[1250px]">
           {view === 'all-days' ? (
