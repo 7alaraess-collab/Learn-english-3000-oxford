@@ -9,6 +9,18 @@ import {
 } from "@workspace/api-zod";
 
 const router = Router();
+const dailyTestModes = new Set(["word-building", "multiple-choice", "matching"]);
+
+function getTestCompletedDayNumbers(testResults: Record<string, { modes: string[] }>) {
+  return Object.entries(testResults)
+    .map(([key, result]) => {
+      const match = /^daily-(\d+)$/.exec(key);
+      if (!match || !result.modes.some((mode) => dailyTestModes.has(mode))) return null;
+      const dayNumber = Number(match[1]);
+      return Number.isInteger(dayNumber) && dayNumber >= 1 && dayNumber <= 300 ? dayNumber : null;
+    })
+    .filter((dayNumber): dayNumber is number => dayNumber !== null);
+}
 
 function requireUser(req: Request, res: Response, next: NextFunction) {
   const userId = getAuth(req).userId;
@@ -37,7 +49,10 @@ function serializeProgress(progress: {
 }) {
   return {
     completedWordIds: progress.completedWordIds,
-    completedDayNumbers: progress.completedDayNumbers,
+    completedDayNumbers: [...new Set([
+      ...progress.completedDayNumbers,
+      ...getTestCompletedDayNumbers(progress.testResults),
+    ])].sort((a, b) => a - b),
     reviewDates: progress.reviewDates,
     reviewMilestones: progress.reviewMilestones,
     starredWordIds: progress.starredWordIds,
@@ -74,12 +89,16 @@ router.put("/progress", requireUser, async (req, res): Promise<void> => {
     return;
   }
 
+  const completedDayNumbers = [...new Set([
+    ...parsed.data.completedDayNumbers,
+    ...getTestCompletedDayNumbers(parsed.data.testResults),
+  ])].sort((a, b) => a - b);
   const [progress] = await db
     .insert(userProgressTable)
     .values({
       userId: res.locals.userId,
       completedWordIds: parsed.data.completedWordIds,
-      completedDayNumbers: parsed.data.completedDayNumbers,
+      completedDayNumbers,
       reviewDates: parsed.data.reviewDates,
       reviewMilestones: parsed.data.reviewMilestones,
       starredWordIds: parsed.data.starredWordIds,
@@ -91,7 +110,7 @@ router.put("/progress", requireUser, async (req, res): Promise<void> => {
       target: userProgressTable.userId,
       set: {
         completedWordIds: parsed.data.completedWordIds,
-        completedDayNumbers: parsed.data.completedDayNumbers,
+        completedDayNumbers,
         reviewDates: parsed.data.reviewDates,
         reviewMilestones: parsed.data.reviewMilestones,
         starredWordIds: parsed.data.starredWordIds,

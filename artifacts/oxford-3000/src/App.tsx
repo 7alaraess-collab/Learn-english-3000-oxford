@@ -931,6 +931,19 @@ function getCompletedDayNumbers(days: EditableWord[][], reviewed: Set<number>) {
   }, []);
 }
 
+function getTestCompletedDayNumbers(testResults: Record<string, SavedTestResult>) {
+  return Object.keys(testResults)
+    .map((key) => {
+      const match = /^daily-(\d+)$/.exec(key);
+      if (!match) return null;
+      const dayNumber = Number(match[1]);
+      const result = testResults[key];
+      const hasDailyTest = result.modes.some((mode) => mode === 'word-building' || mode === 'multiple-choice' || mode === 'matching');
+      return hasDailyTest && Number.isInteger(dayNumber) && dayNumber >= 1 && dayNumber <= curriculumDays ? dayNumber : null;
+    })
+    .filter((dayNumber): dayNumber is number => dayNumber !== null);
+}
+
 function getDayNumberForWordId(id: number) {
   const wordIndex = sourceWords.findIndex((word) => word.id === id);
   return wordIndex < 0 ? null : Math.floor(wordIndex / wordsPerDay) + 1;
@@ -1587,24 +1600,6 @@ function getReviewBlocks(totalDays: number): ReviewBlock[] {
   return blocks;
 }
 
-function getRequiredReviewBlockForDay(dayNumber: number, totalDays: number) {
-  const blocks = getReviewBlocks(totalDays);
-  const exactEndDay = Math.ceil(dayNumber / 3) * 3;
-  return blocks.find((block) => block.endDay === exactEndDay) ?? blocks[blocks.length - 1];
-}
-
-function getFullyCompletedDayNumbers(days: EditableWord[][], reviewed: Set<number>, reviewMilestones: Record<string, string>) {
-  const studiedDays = new Set(getCompletedDayNumbers(days, reviewed));
-  return days.reduce<number[]>((completed, _dayWords, dayIndex) => {
-    const dayNumber = dayIndex + 1;
-    const requiredReview = getRequiredReviewBlockForDay(dayNumber, days.length);
-    if (studiedDays.has(dayNumber) && requiredReview && reviewMilestones[requiredReview.key]) {
-      completed.push(dayNumber);
-    }
-    return completed;
-  }, []);
-}
-
 function getReviewWordsForBlock(days: EditableWord[][], block: ReviewBlock, avoidSignature?: string) {
   const reviewDaySets = Array.from(
     { length: block.dayCount },
@@ -1843,7 +1838,6 @@ function ReviewView({ days, completedDays, reviewMilestones, reviewed, starred, 
 function AllDaysOverview({ days, reviewed, completedDays, reviewMilestones, onSelectDay, onBlockedDay }: { days: EditableWord[][]; reviewed: Set<number>; completedDays: Set<number>; reviewMilestones: Record<string, string>; onSelectDay: (dayIndex: number) => void; onBlockedDay: (dayNumber: number) => void }) {
   const { language, t } = useLanguage();
   const studiedDays = new Set(getCompletedDayNumbers(days, reviewed));
-  const fullyCompletedDays = new Set(getFullyCompletedDayNumbers(days, reviewed, reviewMilestones));
   const nextUnlockedDay = getNextUnlockedDay(studiedDays, reviewMilestones, days.length);
   return (
     <section className="animate-rise" data-testid="section-all-days">
@@ -1865,7 +1859,7 @@ function AllDaysOverview({ days, reviewed, completedDays, reviewMilestones, onSe
             const reviewedCount = dayWords.filter((word) => reviewed.has(word.id)).length;
             const isLocked = dayNumber > nextUnlockedDay;
             const isStudied = studiedDays.has(dayNumber) || completedDays.has(dayNumber);
-            const isComplete = !isLocked && fullyCompletedDays.has(dayNumber);
+             const isComplete = !isLocked && completedDays.has(dayNumber);
             const firstWord = dayWords[0]?.word ?? '';
             const lastWord = dayWords[dayWords.length - 1]?.word ?? '';
             return (
@@ -2219,7 +2213,7 @@ function Home() {
   const reviewedToday = Object.values(reviewDates).filter((date) => date === today).length;
   const editableWords = useMemo(() => sourceWords.map((word) => ({ ...word, ...(wordOverrides[word.id] ?? {}) })), [wordOverrides]);
   const days = useMemo(() => splitIntoDays(editableWords), [editableWords]);
-  const currentStreak = getCurrentStreak(new Set(getFullyCompletedDayNumbers(days, reviewed, reviewMilestones)));
+  const currentStreak = getCurrentStreak(completedDays);
   useEffect(() => {
     if (!authLoaded) return;
     const userId = isSignedIn ? user?.id ?? null : null;
@@ -2246,6 +2240,7 @@ function Home() {
        const scopedCurrentDayNumber = readNullableProgressNumber(currentDayStorageKey, userId, curriculumDays);
        const scopedCurrentWordId = readNullableProgressNumber(currentWordStorageKey, userId, sourceWords.length);
        const scopedTestResults = readTestResults(userId);
+       const localTestResults = { ...scopedTestResults, ...guestTestResults };
        const localReviewed = new Set([...scopedReviewed, ...guestReviewed]);
        const localStarred = new Set([...scopedStarred, ...guestStarred]);
        const localReviewDates = { ...scopedReviewDates, ...guestReviewDates };
@@ -2253,11 +2248,10 @@ function Home() {
        const localCompletedDays = new Set([
          ...scopedCompletedDays,
          ...guestCompletedDays,
-         ...getCompletedDayNumbers(days, localReviewed),
+         ...getTestCompletedDayNumbers(localTestResults),
        ]);
        const localCurrentDayNumber = scopedCurrentDayNumber ?? guestCurrentDayNumber;
        const localCurrentWordId = scopedCurrentWordId ?? guestCurrentWordId;
-       const localTestResults = { ...scopedTestResults, ...guestTestResults };
       pendingGuestProgressRef.current = {
          reviewed: localReviewed,
          starred: localStarred,
@@ -2294,7 +2288,7 @@ function Home() {
       setReviewMilestones(readReviewMilestones());
       setCompletedDays(new Set([
         ...guestCompletedDays,
-        ...getCompletedDayNumbers(days, guestReviewed),
+         ...getTestCompletedDayNumbers(readTestResults()),
       ]));
       setCurrentDayNumber(readNullableProgressNumber(currentDayStorageKey));
       setCurrentWordId(readNullableProgressNumber(currentWordStorageKey, undefined, sourceWords.length));
@@ -2325,16 +2319,16 @@ function Home() {
     const mergedStarred = resettingProgress
       ? new Set<number>()
       : new Set([...serverStarred, ...(guestProgress?.starred ?? [])]);
-    const mergedCompletedDays = new Set([
-      ...(resettingProgress ? [] : progressQuery.data.completedDayNumbers),
-      ...(resettingProgress ? [] : guestProgress?.completedDays ?? []),
-      ...(resettingProgress ? [] : getCompletedDayNumbers(days, mergedReviewed)),
-    ]);
-    const mergedCurrentDayNumber = resettingProgress ? null : guestProgress?.currentDayNumber ?? progressQuery.data.currentDayNumber;
-    const mergedCurrentWordId = resettingProgress ? null : guestProgress?.currentWordId ?? progressQuery.data.currentWordId;
     const mergedTestResults = resettingProgress
       ? {}
       : { ...(progressQuery.data.testResults ?? {}), ...(guestProgress?.testResults ?? {}) };
+    const mergedCompletedDays = new Set([
+      ...(resettingProgress ? [] : progressQuery.data.completedDayNumbers),
+      ...(resettingProgress ? [] : guestProgress?.completedDays ?? []),
+       ...(resettingProgress ? [] : getTestCompletedDayNumbers(mergedTestResults)),
+    ]);
+    const mergedCurrentDayNumber = resettingProgress ? null : guestProgress?.currentDayNumber ?? progressQuery.data.currentDayNumber;
+    const mergedCurrentWordId = resettingProgress ? null : guestProgress?.currentWordId ?? progressQuery.data.currentWordId;
     setReviewed(mergedReviewed);
     setStarred(mergedStarred);
     setReviewDates(mergedReviewDates);
@@ -2371,7 +2365,7 @@ function Home() {
     if (!authLoaded || !isSignedIn || !user?.id || progressQuery.isLoading || !progressQuery.data || hydratedUserRef.current !== user.id) return;
     const completedDayNumbers = [...new Set([
       ...completedDays,
-      ...getCompletedDayNumbers(days, reviewed),
+      ...getTestCompletedDayNumbers(testResults),
     ])].sort((a, b) => a - b);
     const payload: ProgressInput = {
       completedWordIds: [...reviewed].sort((a, b) => a - b),
@@ -2413,8 +2407,6 @@ function Home() {
     setReviewed((existing) => {
       const next = new Set(existing);
       next.add(id);
-      const completedDayNumbers = getCompletedDayNumbers(days, next);
-      setCompletedDays((existingDays) => new Set([...existingDays, ...completedDayNumbers]));
       return next;
     });
     setReviewDates((existing) => {
@@ -2453,6 +2445,10 @@ function Home() {
   };
   const recordTestResult = (key: string, result: SavedTestResult) => {
     setTestResults((existing) => ({ ...existing, [key]: result }));
+    const completedDayNumber = getTestCompletedDayNumbers({ [key]: result })[0];
+    if (completedDayNumber !== undefined) {
+      setCompletedDays((existing) => new Set([...existing, completedDayNumber]));
+    }
   };
   const updatePosition = (dayNumber: number, wordId: number) => {
     setCurrentDayNumber(dayNumber);
