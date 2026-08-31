@@ -4,7 +4,7 @@ import { ClerkProvider, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
 import { arSA } from '@clerk/localizations';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
-import { getGetProgressQueryKey, useGetProgress, useSaveProgress, type ProgressInput } from '@workspace/api-client-react';
+import { getGetProgressQueryKey, useGetProgress, useSaveProgress, type ProgressInput, type TestResult } from '@workspace/api-client-react';
 import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, Command, Gamepad2, Layers3, Link2, ListFilter, Lock, Menu, Moon, Pencil, RotateCcw, Save, Search, Shuffle, Sparkles, SpellCheck, Star, Sun, Volume2, X } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -77,6 +77,9 @@ const reviewDatesStorageKey = 'wordroom-review-dates';
 const reviewMilestonesStorageKey = 'wordroom-review-milestones';
 const completedDaysStorageKey = 'wordroom-completed-days';
 const starredStorageKey = 'wordroom-starred';
+const currentDayStorageKey = 'wordroom-current-day';
+const currentWordStorageKey = 'wordroom-current-word';
+const testResultsStorageKey = 'wordroom-test-results';
 const dailyGoal = 12;
 const overridesStorageKey = 'wordroom-word-overrides';
 const themePreferenceStorageKey = 'wordroom-theme-preference';
@@ -97,6 +100,7 @@ type AppView = 'study' | 'browse' | 'starred' | 'review' | 'all-days';
 type Language = 'en' | 'ar';
 type Theme = 'light' | 'dark';
 type QuizMode = 'word-building' | 'multiple-choice' | 'matching';
+type SavedTestResult = TestResult;
 type ReviewBlock = {
   key: string;
   dayCount: 3 | 6;
@@ -842,6 +846,47 @@ function readCompletedDayNumbers(userId?: string) {
   }
 }
 
+function readNullableProgressNumber(key: string, userId?: string, maximum = Number.MAX_SAFE_INTEGER) {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(getStorageKey(key, userId)) ?? 'null') as unknown;
+    return typeof saved === 'number' && Number.isInteger(saved) && saved >= 1 && saved <= maximum ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+function readTestResults(userId?: string): Record<string, SavedTestResult> {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(getStorageKey(testResultsStorageKey, userId)) ?? '{}') as unknown;
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {};
+    const validModes = new Set(['word-building', 'multiple-choice', 'matching', 'milestone-review']);
+    return Object.fromEntries(Object.entries(saved).filter(([, result]) => {
+      if (!result || typeof result !== 'object' || Array.isArray(result)) return false;
+      const candidate = result as Record<string, unknown>;
+      return typeof candidate.completedAt === 'string'
+        && typeof candidate.score === 'number'
+        && Number.isInteger(candidate.score)
+        && candidate.score >= 0
+        && typeof candidate.total === 'number'
+        && Number.isInteger(candidate.total)
+        && candidate.total >= 1
+        && Array.isArray(candidate.modes)
+        && candidate.modes.length > 0
+        && candidate.modes.every((mode) => typeof mode === 'string' && validModes.has(mode));
+    }).map(([key, result]) => {
+      const candidate = result as Record<string, unknown>;
+      return [key, {
+        completedAt: candidate.completedAt as string,
+        score: candidate.score as number,
+        total: candidate.total as number,
+        modes: candidate.modes as SavedTestResult['modes'],
+      }];
+    })) as Record<string, SavedTestResult>;
+  } catch {
+    return {};
+  }
+}
+
 function readWordOverrides() {
   try {
     const saved = JSON.parse(window.localStorage.getItem(overridesStorageKey) ?? '{}') as unknown;
@@ -884,6 +929,11 @@ function getCompletedDayNumbers(days: EditableWord[][], reviewed: Set<number>) {
     }
     return completed;
   }, []);
+}
+
+function getDayNumberForWordId(id: number) {
+  const wordIndex = sourceWords.findIndex((word) => word.id === id);
+  return wordIndex < 0 ? null : Math.floor(wordIndex / wordsPerDay) + 1;
 }
 
 function getContiguousCompletedDayCount(completedDays: Set<number>, totalDays: number) {
@@ -1619,7 +1669,7 @@ function ReviewMilestoneCard({ block, words, completed, locked, onStart }: { blo
   );
 }
 
-function ReviewSession({ milestoneKey, dayCount, startDay, endDay, words, reviewed, starred, onMarkReviewed, onToggleStar, onSaveWord, onComplete, onBack }: { milestoneKey: string; dayCount: number; startDay: number; endDay: number; words: EditableWord[]; reviewed: Set<number>; starred: Set<number>; onMarkReviewed: (id: number) => void; onToggleStar: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void; onComplete: (key: string) => void; onBack: () => void }) {
+function ReviewSession({ milestoneKey, dayCount, startDay, endDay, words, reviewed, starred, onMarkReviewed, onToggleStar, onSaveWord, onComplete, onBack, onPositionChange }: { milestoneKey: string; dayCount: number; startDay: number; endDay: number; words: EditableWord[]; reviewed: Set<number>; starred: Set<number>; onMarkReviewed: (id: number) => void; onToggleStar: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void; onComplete: (key: string, result: SavedTestResult) => void; onBack: () => void; onPositionChange: (dayNumber: number, wordId: number) => void }) {
   const { t } = useLanguage();
   const [sessionWordIds, setSessionWordIds] = useState<number[]>(() => words.map((word) => word.id));
   const [flashcardIndex, setFlashcardIndex] = useState(0);
@@ -1632,18 +1682,29 @@ function ReviewSession({ milestoneKey, dayCount, startDay, endDay, words, review
 
   const moveNext = () => {
     setRevealed(false);
-    setFlashcardIndex((current) => (current + 1) % Math.max(sessionWords.length, 1));
+    setFlashcardIndex((current) => {
+      const nextIndex = (current + 1) % Math.max(sessionWords.length, 1);
+      if (sessionWords[nextIndex]) onPositionChange(endDay, sessionWords[nextIndex].id);
+      return nextIndex;
+    });
   };
   const movePrevious = () => {
     setRevealed(false);
-    setFlashcardIndex((current) => (current - 1 + sessionWords.length) % sessionWords.length);
+    setFlashcardIndex((current) => {
+      const nextIndex = (current - 1 + sessionWords.length) % sessionWords.length;
+      if (sessionWords[nextIndex]) onPositionChange(endDay, sessionWords[nextIndex].id);
+      return nextIndex;
+    });
   };
   const shuffleCurrent = () => {
     setRevealed(false);
-    setFlashcardIndex(Math.floor(Math.random() * sessionWords.length));
+    const nextIndex = Math.floor(Math.random() * sessionWords.length);
+    if (sessionWords[nextIndex]) onPositionChange(endDay, sessionWords[nextIndex].id);
+    setFlashcardIndex(nextIndex);
   };
   const completeCard = (result: 'got-it' | 'review-later') => {
     if (!currentWord || sessionComplete) return;
+    onPositionChange(endDay, currentWord.id);
     const nextPendingIds = new Set(pendingReviewIds);
     const nextCompletedIds = new Set(completedIds);
     if (result === 'got-it') {
@@ -1657,17 +1718,26 @@ function ReviewSession({ milestoneKey, dayCount, startDay, endDay, words, review
     setCompletedIds(nextCompletedIds);
     setRevealed(false);
     if (flashcardIndex < sessionWords.length - 1) {
+      const nextWord = sessionWords[flashcardIndex + 1];
+      if (nextWord) onPositionChange(endDay, nextWord.id);
       setFlashcardIndex((current) => current + 1);
       return;
     }
     const nextRoundIds = sessionWords.filter((word) => nextPendingIds.has(word.id)).map((word) => word.id);
     if (nextRoundIds.length > 0) {
+      const nextRoundWord = words.find((word) => word.id === nextRoundIds[0]);
+      if (nextRoundWord) onPositionChange(endDay, nextRoundWord.id);
       setSessionWordIds(nextRoundIds);
       setFlashcardIndex(0);
       return;
     }
     setSessionComplete(true);
-    onComplete(milestoneKey);
+    onComplete(milestoneKey, {
+      completedAt: new Date().toISOString(),
+      score: nextCompletedIds.size,
+      total: words.length,
+      modes: ['milestone-review'],
+    });
   };
 
   if (sessionComplete) {
@@ -1707,7 +1777,7 @@ function ReviewSession({ milestoneKey, dayCount, startDay, endDay, words, review
   );
 }
 
-function ReviewView({ days, completedDays, reviewMilestones, reviewed, starred, onMarkReviewed, onToggleStar, onSaveWord, onCompleteReview }: { days: EditableWord[][]; completedDays: Set<number>; reviewMilestones: Record<string, string>; reviewed: Set<number>; starred: Set<number>; onMarkReviewed: (id: number) => void; onToggleStar: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void; onCompleteReview: (key: string) => void }) {
+function ReviewView({ days, completedDays, reviewMilestones, reviewed, starred, onMarkReviewed, onToggleStar, onSaveWord, onCompleteReview, onPositionChange }: { days: EditableWord[][]; completedDays: Set<number>; reviewMilestones: Record<string, string>; reviewed: Set<number>; starred: Set<number>; onMarkReviewed: (id: number) => void; onToggleStar: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void; onCompleteReview: (key: string, result: SavedTestResult) => void; onPositionChange: (dayNumber: number, wordId: number) => void }) {
   const { language, t } = useLanguage();
   const [activeSession, setActiveSession] = useState<{ block: ReviewBlock; words: EditableWord[] } | null>(null);
   const previousMixSignaturesRef = useRef<Record<string, string>>({});
@@ -1730,11 +1800,12 @@ function ReviewView({ days, completedDays, reviewMilestones, reviewed, starred, 
     if (!unlocked) return;
     const words = getFreshReviewWords(block);
     if (words.length === 0) return;
+    onPositionChange(block.endDay, words[0].id);
     setActiveSession({ block, words });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   if (activeSession) {
-     return <ReviewSession milestoneKey={activeSession.block.key} dayCount={activeSession.block.dayCount} startDay={activeSession.block.startDay} endDay={activeSession.block.endDay} words={activeSession.words} reviewed={reviewed} starred={starred} onMarkReviewed={onMarkReviewed} onToggleStar={onToggleStar} onSaveWord={onSaveWord} onComplete={onCompleteReview} onBack={() => setActiveSession(null)} />;
+     return <ReviewSession milestoneKey={activeSession.block.key} dayCount={activeSession.block.dayCount} startDay={activeSession.block.startDay} endDay={activeSession.block.endDay} words={activeSession.words} reviewed={reviewed} starred={starred} onMarkReviewed={onMarkReviewed} onToggleStar={onToggleStar} onSaveWord={onSaveWord} onComplete={onCompleteReview} onBack={() => setActiveSession(null)} onPositionChange={onPositionChange} />;
   }
   const unlockedBlockCount = reviewBlocks.filter((block, index) => getBlockState(block, index).unlocked).length;
   return (
@@ -1837,7 +1908,7 @@ function AllDaysOverview({ days, reviewed, completedDays, reviewMilestones, onSe
   );
 }
 
-function AllDaysDetail({ dayNumber, words, reviewed, starred, onBack, onMarkReviewed, onToggleStar, onSaveWord }: { dayNumber: number; words: EditableWord[]; reviewed: Set<number>; starred: Set<number>; onBack: () => void; onMarkReviewed: (id: number) => void; onToggleStar: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
+function AllDaysDetail({ dayNumber, words, reviewed, starred, onBack, onMarkReviewed, onToggleStar, onSaveWord, onCompleteTest, onPositionChange }: { dayNumber: number; words: EditableWord[]; reviewed: Set<number>; starred: Set<number>; onBack: () => void; onMarkReviewed: (id: number) => void; onToggleStar: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void; onCompleteTest: (key: string, result: SavedTestResult) => void; onPositionChange: (dayNumber: number, wordId: number) => void }) {
   const { language, t } = useLanguage();
   const [flashcardMode, setFlashcardMode] = useState(false);
   const [sessionWordIds, setSessionWordIds] = useState<number[]>(words.map((word) => word.id));
@@ -1859,6 +1930,7 @@ function AllDaysDetail({ dayNumber, words, reviewed, starred, onBack, onMarkRevi
   const currentWord = sessionWords[flashcardIndex] ?? sessionWords[0];
   const startFlashcardMode = () => {
     setSessionWordIds(words.map((word) => word.id));
+    if (words[0]) onPositionChange(dayNumber, words[0].id);
     setFlashcardIndex(0);
     setRevealed(false);
     setReviewLaterIds(new Set());
@@ -1886,18 +1958,29 @@ function AllDaysDetail({ dayNumber, words, reviewed, starred, onBack, onMarkRevi
   };
   const nextFlashcard = () => {
     setRevealed(false);
-    setFlashcardIndex((current) => (current + 1) % sessionWords.length);
+    setFlashcardIndex((current) => {
+      const nextIndex = (current + 1) % sessionWords.length;
+      if (sessionWords[nextIndex]) onPositionChange(dayNumber, sessionWords[nextIndex].id);
+      return nextIndex;
+    });
   };
   const previousFlashcard = () => {
     setRevealed(false);
-    setFlashcardIndex((current) => (current - 1 + sessionWords.length) % sessionWords.length);
+    setFlashcardIndex((current) => {
+      const nextIndex = (current - 1 + sessionWords.length) % sessionWords.length;
+      if (sessionWords[nextIndex]) onPositionChange(dayNumber, sessionWords[nextIndex].id);
+      return nextIndex;
+    });
   };
   const shuffleFlashcards = () => {
     setRevealed(false);
-    setFlashcardIndex(Math.floor(Math.random() * sessionWords.length));
+    const nextIndex = Math.floor(Math.random() * sessionWords.length);
+    if (sessionWords[nextIndex]) onPositionChange(dayNumber, sessionWords[nextIndex].id);
+    setFlashcardIndex(nextIndex);
   };
   const completeCard = (result: 'got-it' | 'review-later') => {
     if (!currentWord || sessionComplete) return;
+    onPositionChange(dayNumber, currentWord.id);
 
     const nextReviewLaterIds = new Set(reviewLaterIds);
     const nextPendingReviewIds = new Set(pendingReviewIds);
@@ -1914,12 +1997,16 @@ function AllDaysDetail({ dayNumber, words, reviewed, starred, onBack, onMarkRevi
     setRevealed(false);
 
     if (flashcardIndex < sessionWords.length - 1) {
+      const nextWord = sessionWords[flashcardIndex + 1];
+      if (nextWord) onPositionChange(dayNumber, nextWord.id);
       setFlashcardIndex((current) => current + 1);
       return;
     }
 
     const nextRoundIds = sessionWords.filter((word) => nextPendingReviewIds.has(word.id)).map((word) => word.id);
     if (nextRoundIds.length > 0) {
+      const nextRoundWord = words.find((word) => word.id === nextRoundIds[0]);
+      if (nextRoundWord) onPositionChange(dayNumber, nextRoundWord.id);
       setSessionWordIds(nextRoundIds);
       setFlashcardIndex(0);
       setSessionRound((current) => current + 1);
@@ -1975,7 +2062,21 @@ function AllDaysDetail({ dayNumber, words, reviewed, starred, onBack, onMarkRevi
               </div>
            </div>
             {quizStarted ? (
-              <QuizExperience words={quizWords} allWords={words} modes={[...selectedQuizModes]} onBack={() => { setQuizStarted(false); setQuizSelectionVisible(true); }} onFinish={leaveFlashcardMode} />
+              <QuizExperience
+                words={quizWords}
+                allWords={words}
+                modes={[...selectedQuizModes]}
+                onBack={() => { setQuizStarted(false); setQuizSelectionVisible(true); }}
+                onFinish={() => {
+                  onCompleteTest(`daily-${dayNumber}`, {
+                    completedAt: new Date().toISOString(),
+                    score: quizWords.length,
+                    total: quizWords.length,
+                    modes: [...selectedQuizModes],
+                  });
+                  leaveFlashcardMode();
+                }}
+              />
             ) : sessionComplete && quizSelectionVisible ? (
               <QuizSelection words={words} reviewLaterIds={reviewLaterIds} selectedModes={selectedQuizModes} onToggleMode={toggleQuizMode} onStart={startQuiz} onBack={leaveFlashcardMode} />
             ) : sessionComplete && celebrationVisible ? (
@@ -2041,10 +2142,10 @@ function AllDaysDetail({ dayNumber, words, reviewed, starred, onBack, onMarkRevi
   );
 }
 
-function AllDaysView({ days, reviewed, starred, completedDays, reviewMilestones, selectedDayIndex, onSelectDay, onBlockedDay, onBack, onMarkReviewed, onToggleStar, onSaveWord }: { days: EditableWord[][]; reviewed: Set<number>; starred: Set<number>; completedDays: Set<number>; reviewMilestones: Record<string, string>; selectedDayIndex: number | null; onSelectDay: (dayIndex: number) => void; onBlockedDay: (dayNumber: number) => void; onBack: () => void; onMarkReviewed: (id: number) => void; onToggleStar: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void }) {
+function AllDaysView({ days, reviewed, starred, completedDays, reviewMilestones, selectedDayIndex, onSelectDay, onBlockedDay, onBack, onMarkReviewed, onToggleStar, onSaveWord, onCompleteTest, onPositionChange }: { days: EditableWord[][]; reviewed: Set<number>; starred: Set<number>; completedDays: Set<number>; reviewMilestones: Record<string, string>; selectedDayIndex: number | null; onSelectDay: (dayIndex: number) => void; onBlockedDay: (dayNumber: number) => void; onBack: () => void; onMarkReviewed: (id: number) => void; onToggleStar: (id: number) => void; onSaveWord: (id: number, changes: WordOverrides) => void; onCompleteTest: (key: string, result: SavedTestResult) => void; onPositionChange: (dayNumber: number, wordId: number) => void }) {
   const selectedDay = selectedDayIndex === null ? undefined : days[selectedDayIndex];
   if (selectedDay && selectedDayIndex !== null) {
-     return <AllDaysDetail dayNumber={selectedDayIndex + 1} words={selectedDay} reviewed={reviewed} starred={starred} onBack={onBack} onMarkReviewed={onMarkReviewed} onToggleStar={onToggleStar} onSaveWord={onSaveWord} />;
+     return <AllDaysDetail dayNumber={selectedDayIndex + 1} words={selectedDay} reviewed={reviewed} starred={starred} onBack={onBack} onMarkReviewed={onMarkReviewed} onToggleStar={onToggleStar} onSaveWord={onSaveWord} onCompleteTest={onCompleteTest} onPositionChange={onPositionChange} />;
   }
   return <AllDaysOverview days={days} reviewed={reviewed} completedDays={completedDays} reviewMilestones={reviewMilestones} onSelectDay={onSelectDay} onBlockedDay={onBlockedDay} />;
 }
@@ -2052,13 +2153,14 @@ function AllDaysView({ days, reviewed, starred, completedDays, reviewMilestones,
 function Home() {
   const { isLoaded: authLoaded, isSignedIn, user } = useUser();
   const { language, t } = useLanguage();
+  const progressQueryKey = [...getGetProgressQueryKey(), user?.id ?? 'signed-out'];
   const progressQuery = useGetProgress({
-    query: { queryKey: getGetProgressQueryKey(), enabled: authLoaded && !!isSignedIn, staleTime: 0 },
+    query: { queryKey: progressQueryKey, enabled: authLoaded && !!isSignedIn, staleTime: 0 },
   });
   const saveProgressMutation = useSaveProgress({
     mutation: {
       onSuccess: (savedProgress) => {
-        queryClient.setQueryData(getGetProgressQueryKey(), savedProgress);
+        queryClient.setQueryData(progressQueryKey, savedProgress);
       },
     },
   });
@@ -2082,11 +2184,24 @@ function Home() {
   const [reviewDates, setReviewDates] = useState<Record<string, string>>(readReviewDates);
   const [reviewMilestones, setReviewMilestones] = useState<Record<string, string>>(readReviewMilestones);
   const [completedDays, setCompletedDays] = useState<Set<number>>(readCompletedDayNumbers);
+  const [currentDayNumber, setCurrentDayNumber] = useState<number | null>(() => readNullableProgressNumber(currentDayStorageKey, undefined, curriculumDays));
+  const [currentWordId, setCurrentWordId] = useState<number | null>(() => readNullableProgressNumber(currentWordStorageKey, undefined, sourceWords.length));
+  const [testResults, setTestResults] = useState<Record<string, SavedTestResult>>(readTestResults);
   const [wordOverrides, setWordOverrides] = useState<Record<string, WordOverrides>>(readWordOverrides);
   const [blockedDay, setBlockedDay] = useState<number | null>(null);
   const authUserRef = useRef<string | null | undefined>(undefined);
   const hydratedUserRef = useRef<string | null>(null);
   const resetProgressUserRef = useRef<string | null>(null);
+  const pendingGuestProgressRef = useRef<{
+    reviewed: Set<number>;
+    starred: Set<number>;
+    reviewDates: Record<string, string>;
+    reviewMilestones: Record<string, string>;
+    completedDays: Set<number>;
+    currentDayNumber: number | null;
+    currentWordId: number | null;
+    testResults: Record<string, SavedTestResult>;
+  } | null>(null);
   useEffect(() => {
     if (!mobileOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -2115,30 +2230,60 @@ function Home() {
     resetProgressUserRef.current = null;
     lastQueuedProgressRef.current = null;
     if (userId) {
-      const mergedReviewed = new Set([...readReviewedIds(userId), ...readReviewedIds()]);
-      const mergedStarred = new Set([...readStarredIds(userId), ...readStarredIds()]);
-      const mergedReviewDates = { ...readReviewDates(userId), ...readReviewDates() };
-      const mergedReviewMilestones = normalizeReviewMilestones({ ...readReviewMilestones(userId), ...readReviewMilestones() });
-      const mergedCompletedDays = new Set([
-        ...readCompletedDayNumbers(userId),
-        ...readCompletedDayNumbers(),
-        ...getCompletedDayNumbers(days, mergedReviewed),
-      ]);
-      setReviewed(mergedReviewed);
-      setStarred(mergedStarred);
-      setReviewDates(mergedReviewDates);
-      setReviewMilestones(mergedReviewMilestones);
-      setCompletedDays(mergedCompletedDays);
-      window.localStorage.setItem(getStorageKey(reviewedStorageKey, userId), JSON.stringify([...mergedReviewed]));
-      window.localStorage.setItem(getStorageKey(starredStorageKey, userId), JSON.stringify([...mergedStarred]));
-      window.localStorage.setItem(getStorageKey(reviewDatesStorageKey, userId), JSON.stringify(mergedReviewDates));
-      window.localStorage.setItem(getStorageKey(reviewMilestonesStorageKey, userId), JSON.stringify(mergedReviewMilestones));
-      window.localStorage.setItem(getStorageKey(completedDaysStorageKey, userId), JSON.stringify([...mergedCompletedDays].sort((a, b) => a - b)));
+       const guestReviewed = readReviewedIds();
+       const guestStarred = readStarredIds();
+       const guestReviewDates = readReviewDates();
+       const guestReviewMilestones = readReviewMilestones();
+       const guestCompletedDays = readCompletedDayNumbers();
+       const guestCurrentDayNumber = readNullableProgressNumber(currentDayStorageKey, undefined, curriculumDays);
+       const guestCurrentWordId = readNullableProgressNumber(currentWordStorageKey, undefined, sourceWords.length);
+       const guestTestResults = readTestResults();
+       const scopedReviewed = readReviewedIds(userId);
+       const scopedStarred = readStarredIds(userId);
+       const scopedReviewDates = readReviewDates(userId);
+       const scopedReviewMilestones = readReviewMilestones(userId);
+       const scopedCompletedDays = readCompletedDayNumbers(userId);
+       const scopedCurrentDayNumber = readNullableProgressNumber(currentDayStorageKey, userId, curriculumDays);
+       const scopedCurrentWordId = readNullableProgressNumber(currentWordStorageKey, userId, sourceWords.length);
+       const scopedTestResults = readTestResults(userId);
+       const localReviewed = new Set([...scopedReviewed, ...guestReviewed]);
+       const localStarred = new Set([...scopedStarred, ...guestStarred]);
+       const localReviewDates = { ...scopedReviewDates, ...guestReviewDates };
+       const localReviewMilestones = normalizeReviewMilestones({ ...scopedReviewMilestones, ...guestReviewMilestones });
+       const localCompletedDays = new Set([
+         ...scopedCompletedDays,
+         ...guestCompletedDays,
+         ...getCompletedDayNumbers(days, localReviewed),
+       ]);
+       const localCurrentDayNumber = scopedCurrentDayNumber ?? guestCurrentDayNumber;
+       const localCurrentWordId = scopedCurrentWordId ?? guestCurrentWordId;
+       const localTestResults = { ...scopedTestResults, ...guestTestResults };
+      pendingGuestProgressRef.current = {
+         reviewed: localReviewed,
+         starred: localStarred,
+         reviewDates: localReviewDates,
+         reviewMilestones: localReviewMilestones,
+         completedDays: localCompletedDays,
+         currentDayNumber: localCurrentDayNumber,
+         currentWordId: localCurrentWordId,
+         testResults: localTestResults,
+      };
+       setReviewed(localReviewed);
+       setStarred(localStarred);
+       setReviewDates(localReviewDates);
+       setReviewMilestones(localReviewMilestones);
+       setCompletedDays(localCompletedDays);
+       setCurrentDayNumber(localCurrentDayNumber);
+       setCurrentWordId(localCurrentWordId);
+       setTestResults(localTestResults);
       window.localStorage.removeItem(reviewedStorageKey);
       window.localStorage.removeItem(starredStorageKey);
       window.localStorage.removeItem(reviewDatesStorageKey);
       window.localStorage.removeItem(reviewMilestonesStorageKey);
       window.localStorage.removeItem(completedDaysStorageKey);
+      window.localStorage.removeItem(currentDayStorageKey);
+      window.localStorage.removeItem(currentWordStorageKey);
+      window.localStorage.removeItem(testResultsStorageKey);
     } else {
       const guestReviewed = readReviewedIds();
       const guestStarred = readStarredIds();
@@ -2151,6 +2296,9 @@ function Home() {
         ...guestCompletedDays,
         ...getCompletedDayNumbers(days, guestReviewed),
       ]));
+      setCurrentDayNumber(readNullableProgressNumber(currentDayStorageKey));
+      setCurrentWordId(readNullableProgressNumber(currentWordStorageKey, undefined, sourceWords.length));
+      setTestResults(readTestResults());
     }
   }, [authLoaded, isSignedIn, user?.id, days]);
 
@@ -2164,23 +2312,45 @@ function Home() {
     const serverStarred = resettingProgress
       ? new Set<number>()
       : new Set(progressQuery.data.starredWordIds.filter((id) => sourceWords.some((word) => word.id === id)));
-    const mergedReviewDates = resettingProgress ? {} : { ...(progressQuery.data.reviewDates ?? {}), ...reviewDates };
-    const mergedReviewMilestones = resettingProgress ? {} : normalizeReviewMilestones({ ...(progressQuery.data.reviewMilestones ?? {}), ...reviewMilestones });
-    const mergedReviewed = resettingProgress ? new Set<number>() : new Set([...reviewed, ...serverReviewed]);
-    const mergedStarred = resettingProgress ? new Set<number>() : new Set([...starred, ...serverStarred]);
+    const guestProgress = pendingGuestProgressRef.current;
+    const mergedReviewDates = resettingProgress
+      ? {}
+      : { ...(progressQuery.data.reviewDates ?? {}), ...(guestProgress?.reviewDates ?? {}) };
+    const mergedReviewMilestones = resettingProgress
+      ? {}
+      : normalizeReviewMilestones({ ...(progressQuery.data.reviewMilestones ?? {}), ...(guestProgress?.reviewMilestones ?? {}) });
+    const mergedReviewed = resettingProgress
+      ? new Set<number>()
+      : new Set([...serverReviewed, ...(guestProgress?.reviewed ?? [])]);
+    const mergedStarred = resettingProgress
+      ? new Set<number>()
+      : new Set([...serverStarred, ...(guestProgress?.starred ?? [])]);
     const mergedCompletedDays = new Set([
       ...(resettingProgress ? [] : progressQuery.data.completedDayNumbers),
-      ...(resettingProgress ? [] : readCompletedDayNumbers(user.id)),
+      ...(resettingProgress ? [] : guestProgress?.completedDays ?? []),
       ...(resettingProgress ? [] : getCompletedDayNumbers(days, mergedReviewed)),
     ]);
+    const mergedCurrentDayNumber = resettingProgress ? null : guestProgress?.currentDayNumber ?? progressQuery.data.currentDayNumber;
+    const mergedCurrentWordId = resettingProgress ? null : guestProgress?.currentWordId ?? progressQuery.data.currentWordId;
+    const mergedTestResults = resettingProgress
+      ? {}
+      : { ...(progressQuery.data.testResults ?? {}), ...(guestProgress?.testResults ?? {}) };
     setReviewed(mergedReviewed);
     setStarred(mergedStarred);
     setReviewDates(mergedReviewDates);
     setReviewMilestones(mergedReviewMilestones);
     setCompletedDays(mergedCompletedDays);
+    setCurrentDayNumber(mergedCurrentDayNumber);
+    setCurrentWordId(mergedCurrentWordId);
+    setTestResults(mergedTestResults);
+    if (mergedCurrentWordId !== null) {
+      const restoredIndex = editableWords.findIndex((word) => word.id === mergedCurrentWordId);
+      if (restoredIndex >= 0) setCurrentIndex(restoredIndex);
+    }
     hydratedUserRef.current = user.id;
     resetProgressUserRef.current = null;
-  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, starred, days, reviewDates, reviewMilestones]);
+    pendingGuestProgressRef.current = null;
+  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, starred, days, reviewDates, reviewMilestones, editableWords]);
 
   useEffect(() => {
     if (!authLoaded) return;
@@ -2190,7 +2360,12 @@ function Home() {
     window.localStorage.setItem(getStorageKey(reviewDatesStorageKey, userId), JSON.stringify(reviewDates));
     window.localStorage.setItem(getStorageKey(reviewMilestonesStorageKey, userId), JSON.stringify(reviewMilestones));
     window.localStorage.setItem(getStorageKey(completedDaysStorageKey, userId), JSON.stringify([...completedDays].sort((a, b) => a - b)));
-  }, [authLoaded, isSignedIn, user?.id, reviewed, starred, reviewDates, reviewMilestones, completedDays]);
+    if (currentDayNumber === null) window.localStorage.removeItem(getStorageKey(currentDayStorageKey, userId));
+    else window.localStorage.setItem(getStorageKey(currentDayStorageKey, userId), JSON.stringify(currentDayNumber));
+    if (currentWordId === null) window.localStorage.removeItem(getStorageKey(currentWordStorageKey, userId));
+    else window.localStorage.setItem(getStorageKey(currentWordStorageKey, userId), JSON.stringify(currentWordId));
+    window.localStorage.setItem(getStorageKey(testResultsStorageKey, userId), JSON.stringify(testResults));
+  }, [authLoaded, isSignedIn, user?.id, reviewed, starred, reviewDates, reviewMilestones, completedDays, currentDayNumber, currentWordId, testResults]);
 
   useEffect(() => {
     if (!authLoaded || !isSignedIn || !user?.id || progressQuery.isLoading || !progressQuery.data || hydratedUserRef.current !== user.id) return;
@@ -2204,12 +2379,15 @@ function Home() {
       completedDayNumbers,
       reviewDates,
       reviewMilestones,
+      currentDayNumber,
+      currentWordId,
+      testResults,
     };
     const fingerprint = JSON.stringify(payload);
     if (lastQueuedProgressRef.current === fingerprint) return;
     lastQueuedProgressRef.current = fingerprint;
     queueProgressSave(payload);
-  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, starred, completedDays, days, reviewDates, reviewMilestones, queueProgressSave]);
+  }, [authLoaded, isSignedIn, user?.id, progressQuery.data, progressQuery.isLoading, reviewed, starred, completedDays, days, reviewDates, reviewMilestones, currentDayNumber, currentWordId, testResults, queueProgressSave]);
   const filteredWords = useMemo(() => {
     const normalized = search.trim().toLocaleLowerCase();
     return editableWords.filter((word) => {
@@ -2221,7 +2399,17 @@ function Home() {
   }, [editableWords, search, level, part]);
   const starredWords = useMemo(() => editableWords.filter((word) => starred.has(word.id)), [editableWords, starred]);
   useEffect(() => { if (currentIndex >= filteredWords.length) setCurrentIndex(0); }, [currentIndex, filteredWords.length]);
+  const setStudyIndex = (index: number) => {
+    setCurrentIndex(index);
+    const word = filteredWords[index];
+    if (word) {
+      setCurrentWordId(word.id);
+      setCurrentDayNumber(getDayNumberForWordId(word.id));
+    }
+  };
   const markReviewed = (id: number) => {
+    setCurrentWordId(id);
+    setCurrentDayNumber(getDayNumberForWordId(id));
     setReviewed((existing) => {
       const next = new Set(existing);
       next.add(id);
@@ -2242,9 +2430,19 @@ function Home() {
       return next;
     });
   };
-  const selectWord = (word: EditableWord) => { const index = filteredWords.findIndex((item) => item.id === word.id); setCurrentIndex(Math.max(index, 0)); setView('study'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const selectWord = (word: EditableWord) => {
+    const index = filteredWords.findIndex((item) => item.id === word.id);
+    setStudyIndex(Math.max(index, 0));
+    setView('study');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const navigate = (nextView: AppView) => { setView(nextView); if (nextView === 'all-days') setSelectedDayIndex(null); };
-  const selectDay = (dayIndex: number) => { setSelectedDayIndex(dayIndex); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const selectDay = (dayIndex: number) => {
+    setSelectedDayIndex(dayIndex);
+    setCurrentDayNumber(dayIndex + 1);
+    setCurrentWordId(days[dayIndex]?.[0]?.id ?? null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const blockedDayNotice = (dayNumber: number) => setBlockedDay(dayNumber);
   const saveWord = (id: number, changes: WordOverrides) => {
     setWordOverrides((existing) => {
@@ -2253,8 +2451,16 @@ function Home() {
       return next;
     });
   };
-  const completeReviewMilestone = (key: string) => {
+  const recordTestResult = (key: string, result: SavedTestResult) => {
+    setTestResults((existing) => ({ ...existing, [key]: result }));
+  };
+  const updatePosition = (dayNumber: number, wordId: number) => {
+    setCurrentDayNumber(dayNumber);
+    setCurrentWordId(wordId);
+  };
+  const completeReviewMilestone = (key: string, result: SavedTestResult) => {
     setReviewMilestones((existing) => ({ ...existing, [key]: today }));
+    recordTestResult(`milestone-${key}`, result);
   };
   const resetAllData = () => {
     if (!window.confirm(t.resetAllDataConfirmation)) return;
@@ -2266,20 +2472,26 @@ function Home() {
       completedDayNumbers: [],
       reviewDates: {},
       reviewMilestones: {},
+      currentDayNumber: null,
+      currentWordId: null,
+      testResults: {},
     };
     setReviewed(new Set());
     setStarred(new Set());
     setReviewDates({});
     setReviewMilestones({});
     setCompletedDays(new Set());
-    for (const key of [reviewedStorageKey, starredStorageKey, reviewDatesStorageKey, reviewMilestonesStorageKey, completedDaysStorageKey]) {
+    setCurrentDayNumber(null);
+    setCurrentWordId(null);
+    setTestResults({});
+    for (const key of [reviewedStorageKey, starredStorageKey, reviewDatesStorageKey, reviewMilestonesStorageKey, completedDaysStorageKey, currentDayStorageKey, currentWordStorageKey, testResultsStorageKey]) {
       window.localStorage.removeItem(getStorageKey(key, userId));
       window.localStorage.removeItem(getStorageKey(key));
     }
     if (userId) {
       resetProgressUserRef.current = userId;
       lastQueuedProgressRef.current = JSON.stringify(emptyProgress);
-      queryClient.setQueryData(getGetProgressQueryKey(), emptyProgress);
+      queryClient.setQueryData(progressQueryKey, emptyProgress);
       queueProgressSave(emptyProgress);
     }
   };
@@ -2298,11 +2510,11 @@ function Home() {
        <main className="app-main ml-0 px-5 pb-16 pt-9 md:ml-[264px] md:px-10 md:pt-12">
         <div className="mx-auto max-w-[1250px]">
           {view === 'all-days' ? (
-             <AllDaysView days={days} reviewed={reviewed} starred={starred} completedDays={completedDays} reviewMilestones={reviewMilestones} selectedDayIndex={selectedDayIndex} onSelectDay={selectDay} onBlockedDay={blockedDayNotice} onBack={() => setSelectedDayIndex(null)} onMarkReviewed={markReviewed} onToggleStar={toggleStar} onSaveWord={saveWord} />
+             <AllDaysView days={days} reviewed={reviewed} starred={starred} completedDays={completedDays} reviewMilestones={reviewMilestones} selectedDayIndex={selectedDayIndex} onSelectDay={selectDay} onBlockedDay={blockedDayNotice} onBack={() => setSelectedDayIndex(null)} onMarkReviewed={markReviewed} onToggleStar={toggleStar} onSaveWord={saveWord} onCompleteTest={recordTestResult} onPositionChange={updatePosition} />
            ) : view === 'starred' ? (
              <StarredWordsView words={starredWords} starred={starred} reviewed={reviewed} onToggleStar={toggleStar} onMarkReviewed={markReviewed} onSaveWord={saveWord} />
            ) : view === 'review' ? (
-             <ReviewView days={days} completedDays={completedDays} reviewMilestones={reviewMilestones} reviewed={reviewed} starred={starred} onMarkReviewed={markReviewed} onToggleStar={toggleStar} onSaveWord={saveWord} onCompleteReview={completeReviewMilestone} />
+             <ReviewView days={days} completedDays={completedDays} reviewMilestones={reviewMilestones} reviewed={reviewed} starred={starred} onMarkReviewed={markReviewed} onToggleStar={toggleStar} onSaveWord={saveWord} onCompleteReview={completeReviewMilestone} onPositionChange={updatePosition} />
           ) : (
             <>
            <div className="animate-rise mb-9 flex flex-col justify-between gap-5 md:flex-row md:items-end">
@@ -2311,7 +2523,7 @@ function Home() {
           </div>
              <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-3"><StatCard label={t.wordsMet} value={String(reviewed.size)} detail={t.wordsOfGoal} accent="bg-[#24635f]" /><StatCard label={t.inThisView} value={String(filteredWords.length)} detail={t.matchingFilters} accent="bg-[#ef7657]" /><StatCard label={t.dailyRhythm} value={`${Math.min(reviewedToday, dailyGoal)} / ${dailyGoal}`} detail={t.dailyWordsSession} accent="bg-[#f3d24f]" /></div>
           <Filters search={search} setSearch={setSearch} level={level} setLevel={setLevel} part={part} setPart={setPart} resultCount={filteredWords.length} />
-           <div className="mt-8" id="library">{view === 'study' ? <StudyHome words={filteredWords} currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} reviewed={reviewed} starred={starred} markReviewed={markReviewed} onToggleStar={toggleStar} onSaveWord={saveWord} /> : <BrowseList words={filteredWords} starred={starred} onSelect={selectWord} onToggleStar={toggleStar} />}</div>
+           <div className="mt-8" id="library">{view === 'study' ? <StudyHome words={filteredWords} currentIndex={currentIndex} setCurrentIndex={setStudyIndex} reviewed={reviewed} starred={starred} markReviewed={markReviewed} onToggleStar={toggleStar} onSaveWord={saveWord} /> : <BrowseList words={filteredWords} starred={starred} onSelect={selectWord} onToggleStar={toggleStar} />}</div>
             </>
           )}
         </div>

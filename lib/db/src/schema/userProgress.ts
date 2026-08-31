@@ -23,6 +23,17 @@ export const userProgressTable = pgTable("user_progress", {
     .array()
     .notNull()
     .default(sql`ARRAY[]::integer[]`),
+  currentDayNumber: integer("current_day_number"),
+  currentWordId: integer("current_word_id"),
+  testResults: jsonb("test_results")
+    .$type<Record<string, {
+      completedAt: string;
+      score: number;
+      total: number;
+      modes: string[];
+    }>>()
+    .notNull()
+    .default(sql`'{}'::jsonb`),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

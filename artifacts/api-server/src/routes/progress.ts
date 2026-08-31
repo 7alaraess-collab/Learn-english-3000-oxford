@@ -26,6 +26,14 @@ function serializeProgress(progress: {
   reviewDates: Record<string, string>;
   reviewMilestones: Record<string, string>;
   starredWordIds: number[];
+  currentDayNumber: number | null;
+  currentWordId: number | null;
+  testResults: Record<string, {
+    completedAt: string;
+    score: number;
+    total: number;
+    modes: string[];
+  }>;
 }) {
   return {
     completedWordIds: progress.completedWordIds,
@@ -33,6 +41,9 @@ function serializeProgress(progress: {
     reviewDates: progress.reviewDates,
     reviewMilestones: progress.reviewMilestones,
     starredWordIds: progress.starredWordIds,
+    currentDayNumber: progress.currentDayNumber,
+    currentWordId: progress.currentWordId,
+    testResults: progress.testResults,
   };
 }
 
@@ -47,6 +58,9 @@ router.get("/progress", requireUser, async (_req, res): Promise<void> => {
     reviewDates: {},
     reviewMilestones: {},
     starredWordIds: [],
+    currentDayNumber: null,
+    currentWordId: null,
+    testResults: {},
   })));
 });
 
@@ -69,6 +83,9 @@ router.put("/progress", requireUser, async (req, res): Promise<void> => {
       reviewDates: parsed.data.reviewDates,
       reviewMilestones: parsed.data.reviewMilestones,
       starredWordIds: parsed.data.starredWordIds,
+      currentDayNumber: parsed.data.currentDayNumber,
+      currentWordId: parsed.data.currentWordId,
+      testResults: parsed.data.testResults,
     })
     .onConflictDoUpdate({
       target: userProgressTable.userId,
@@ -78,6 +95,9 @@ router.put("/progress", requireUser, async (req, res): Promise<void> => {
         reviewDates: parsed.data.reviewDates,
         reviewMilestones: parsed.data.reviewMilestones,
         starredWordIds: parsed.data.starredWordIds,
+        currentDayNumber: parsed.data.currentDayNumber,
+        currentWordId: parsed.data.currentWordId,
+        testResults: parsed.data.testResults,
         updatedAt: new Date(),
       },
     })
@@ -87,6 +107,9 @@ router.put("/progress", requireUser, async (req, res): Promise<void> => {
       reviewDates: userProgressTable.reviewDates,
       reviewMilestones: userProgressTable.reviewMilestones,
       starredWordIds: userProgressTable.starredWordIds,
+      currentDayNumber: userProgressTable.currentDayNumber,
+      currentWordId: userProgressTable.currentWordId,
+      testResults: userProgressTable.testResults,
     });
 
   res.json(SaveProgressResponse.parse(serializeProgress(progress)));

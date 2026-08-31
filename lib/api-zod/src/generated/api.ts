@@ -26,6 +26,13 @@ export const getProgressResponseCompletedDayNumbersItemMax = 300;
 
 export const getProgressResponseStarredWordIdsItemMax = 3000;
 
+export const getProgressResponseCurrentDayNumberMax = 250;
+
+export const getProgressResponseCurrentWordIdMax = 3000;
+
+export const getProgressResponseTestResultsScoreMin = 0;
+
+
 
 
 export const GetProgressResponse = zod.object({
@@ -33,7 +40,15 @@ export const GetProgressResponse = zod.object({
   "completedDayNumbers": zod.array(zod.number().int().min(1).max(getProgressResponseCompletedDayNumbersItemMax)),
   "reviewDates": zod.record(zod.string(), zod.string()),
   "reviewMilestones": zod.record(zod.string(), zod.string()),
-  "starredWordIds": zod.array(zod.number().int().min(1).max(getProgressResponseStarredWordIdsItemMax))
+  "starredWordIds": zod.array(zod.number().int().min(1).max(getProgressResponseStarredWordIdsItemMax)),
+  "currentDayNumber": zod.number().int().min(1).max(getProgressResponseCurrentDayNumberMax).nullable(),
+  "currentWordId": zod.number().int().min(1).max(getProgressResponseCurrentWordIdMax).nullable(),
+  "testResults": zod.record(zod.string(), zod.object({
+  "completedAt": zod.string(),
+  "score": zod.number().int().min(getProgressResponseTestResultsScoreMin),
+  "total": zod.number().int().min(1),
+  "modes": zod.array(zod.enum(['word-building', 'multiple-choice', 'matching', 'milestone-review']))
+}))
 })
 
 
@@ -52,6 +67,13 @@ export const saveProgressBodyStarredWordIdsItemMax = 3000;
 
 export const saveProgressBodyStarredWordIdsMax = 3000;
 
+export const saveProgressBodyCurrentDayNumberMax = 250;
+
+export const saveProgressBodyCurrentWordIdMax = 3000;
+
+export const saveProgressBodyTestResultsScoreMin = 0;
+
+
 
 
 export const SaveProgressBody = zod.object({
@@ -59,7 +81,15 @@ export const SaveProgressBody = zod.object({
   "completedDayNumbers": zod.array(zod.number().int().min(1).max(saveProgressBodyCompletedDayNumbersItemMax)).max(saveProgressBodyCompletedDayNumbersMax),
   "reviewDates": zod.record(zod.string(), zod.string()),
   "reviewMilestones": zod.record(zod.string(), zod.string()),
-  "starredWordIds": zod.array(zod.number().int().min(1).max(saveProgressBodyStarredWordIdsItemMax)).max(saveProgressBodyStarredWordIdsMax)
+  "starredWordIds": zod.array(zod.number().int().min(1).max(saveProgressBodyStarredWordIdsItemMax)).max(saveProgressBodyStarredWordIdsMax),
+  "currentDayNumber": zod.number().int().min(1).max(saveProgressBodyCurrentDayNumberMax).nullable(),
+  "currentWordId": zod.number().int().min(1).max(saveProgressBodyCurrentWordIdMax).nullable(),
+  "testResults": zod.record(zod.string(), zod.object({
+  "completedAt": zod.string(),
+  "score": zod.number().int().min(saveProgressBodyTestResultsScoreMin),
+  "total": zod.number().int().min(1),
+  "modes": zod.array(zod.enum(['word-building', 'multiple-choice', 'matching', 'milestone-review']))
+}))
 })
 
 export const saveProgressResponseCompletedWordIdsItemMax = 3000;
@@ -68,6 +98,13 @@ export const saveProgressResponseCompletedDayNumbersItemMax = 300;
 
 export const saveProgressResponseStarredWordIdsItemMax = 3000;
 
+export const saveProgressResponseCurrentDayNumberMax = 250;
+
+export const saveProgressResponseCurrentWordIdMax = 3000;
+
+export const saveProgressResponseTestResultsScoreMin = 0;
+
+
 
 
 export const SaveProgressResponse = zod.object({
@@ -75,7 +112,15 @@ export const SaveProgressResponse = zod.object({
   "completedDayNumbers": zod.array(zod.number().int().min(1).max(saveProgressResponseCompletedDayNumbersItemMax)),
   "reviewDates": zod.record(zod.string(), zod.string()),
   "reviewMilestones": zod.record(zod.string(), zod.string()),
-  "starredWordIds": zod.array(zod.number().int().min(1).max(saveProgressResponseStarredWordIdsItemMax))
+  "starredWordIds": zod.array(zod.number().int().min(1).max(saveProgressResponseStarredWordIdsItemMax)),
+  "currentDayNumber": zod.number().int().min(1).max(saveProgressResponseCurrentDayNumberMax).nullable(),
+  "currentWordId": zod.number().int().min(1).max(saveProgressResponseCurrentWordIdMax).nullable(),
+  "testResults": zod.record(zod.string(), zod.object({
+  "completedAt": zod.string(),
+  "score": zod.number().int().min(saveProgressResponseTestResultsScoreMin),
+  "total": zod.number().int().min(1),
+  "modes": zod.array(zod.enum(['word-building', 'multiple-choice', 'matching', 'milestone-review']))
+}))
 })
 
 

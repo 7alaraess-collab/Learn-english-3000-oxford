@@ -7,6 +7,7 @@
  */
 import type { ProgressInputReviewDates } from './progressInputReviewDates';
 import type { ProgressInputReviewMilestones } from './progressInputReviewMilestones';
+import type { ProgressInputTestResults } from './progressInputTestResults';
 
 export interface ProgressInput {
   /**
@@ -29,4 +30,17 @@ export interface ProgressInput {
      * @items.maximum 3000
      */
   starredWordIds: number[];
+  /**
+     * @minimum 1
+     * @maximum 250
+     * @nullable
+     */
+  currentDayNumber: number | null;
+  /**
+     * @minimum 1
+     * @maximum 3000
+     * @nullable
+     */
+  currentWordId: number | null;
+  testResults: ProgressInputTestResults;
 }

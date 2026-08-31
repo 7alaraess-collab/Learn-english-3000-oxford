@@ -13,6 +13,27 @@ export type ProgressReviewDates = {[key: string]: string};
 
 export type ProgressReviewMilestones = {[key: string]: string};
 
+export type TestResultModesItem = typeof TestResultModesItem[keyof typeof TestResultModesItem];
+
+
+export const TestResultModesItem = {
+  'word-building': 'word-building',
+  'multiple-choice': 'multiple-choice',
+  matching: 'matching',
+  'milestone-review': 'milestone-review',
+} as const;
+
+export interface TestResult {
+  completedAt: string;
+  /** @minimum 0 */
+  score: number;
+  /** @minimum 1 */
+  total: number;
+  modes: TestResultModesItem[];
+}
+
+export type ProgressTestResults = {[key: string]: TestResult};
+
 export interface Progress {
   /**
      * @items.minimum 1
@@ -31,11 +52,26 @@ export interface Progress {
      * @items.maximum 3000
      */
   starredWordIds: number[];
+  /**
+     * @minimum 1
+     * @maximum 250
+     * @nullable
+     */
+  currentDayNumber: number | null;
+  /**
+     * @minimum 1
+     * @maximum 3000
+     * @nullable
+     */
+  currentWordId: number | null;
+  testResults: ProgressTestResults;
 }
 
 export type ProgressInputReviewDates = {[key: string]: string};
 
 export type ProgressInputReviewMilestones = {[key: string]: string};
+
+export type ProgressInputTestResults = {[key: string]: TestResult};
 
 export interface ProgressInput {
   /**
@@ -58,5 +94,18 @@ export interface ProgressInput {
      * @items.maximum 3000
      */
   starredWordIds: number[];
+  /**
+     * @minimum 1
+     * @maximum 250
+     * @nullable
+     */
+  currentDayNumber: number | null;
+  /**
+     * @minimum 1
+     * @maximum 3000
+     * @nullable
+     */
+  currentWordId: number | null;
+  testResults: ProgressInputTestResults;
 }
 
