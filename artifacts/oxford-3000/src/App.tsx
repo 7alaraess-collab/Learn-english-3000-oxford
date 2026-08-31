@@ -219,6 +219,10 @@ const translations = {
     finishQuiz: 'Finish quiz',
     quizComplete: 'Practice complete',
     quizCompleteDescription: 'A small review today makes tomorrow easier.',
+     studyCelebrationTitle: 'Great job!',
+     studyCelebrationMessage: (count: number) => `You've mastered today's ${count} words. Keep going!`,
+     testCelebrationTitle: 'Awesome!',
+     testCelebrationMessage: 'One step closer to fluency.',
     backToDay: 'Back to day',
     selectedModes: (count: number) => `${count} ${count === 1 ? 'game' : 'games'} selected`,
     searchEnglishArabic: 'Search English or Arabic',
@@ -398,6 +402,10 @@ const translations = {
     finishQuiz: 'إنهاء الاختبار',
     quizComplete: 'اكتمل التدريب',
     quizCompleteDescription: 'مراجعة صغيرة اليوم تجعل الغد أسهل.',
+     studyCelebrationTitle: 'أحسنت!',
+     studyCelebrationMessage: (count: number) => `أتقنت كلمات اليوم وعددها ${count}. واصل التقدم!`,
+     testCelebrationTitle: 'رائع!',
+     testCelebrationMessage: 'خطوة أخرى نحو الطلاقة.',
     backToDay: 'العودة إلى اليوم',
     selectedModes: (count: number) => `${count} ${count === 1 ? 'لعبة مختارة' : 'ألعاب مختارة'}`,
     searchEnglishArabic: 'ابحث بالإنجليزية أو العربية',
@@ -769,6 +777,22 @@ function MatchingGame({ words, onDone }: { words: EditableWord[]; onDone: () => 
   );
 }
 
+function CelebrationCard({ title, message, actionLabel, actionTestId, onAction }: { title: string; message: string; actionLabel: string; actionTestId: string; onAction: () => void }) {
+  return (
+    <div className="animate-celebrate relative w-full max-w-[500px] overflow-hidden rounded-[30px] border border-[#c9e2dc] bg-[#edf7f3] px-7 py-14 text-center shadow-[0_24px_70px_rgba(31,41,55,.22)] sm:px-12">
+      <div className="celebration-confetti" aria-hidden="true">
+        {Array.from({ length: 14 }, (_, index) => <span key={index} />)}
+      </div>
+      <div className="celebration-orbit celebration-orbit-one" />
+      <div className="celebration-orbit celebration-orbit-two" />
+      <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#24635f] text-[#f9f5e9] shadow-[0_0_0_10px_rgba(36,99,95,.08)]"><Sparkles size={28} /></div>
+      <h2 className="relative mt-6 font-display text-[clamp(2.3rem,6vw,3.5rem)] leading-none tracking-[-.055em] text-[#202a40]">{title}</h2>
+      <p className="relative mx-auto mt-4 max-w-[340px] text-sm leading-relaxed text-[#5f675f]">{message}</p>
+      <button type="button" data-testid={actionTestId} onClick={onAction} className="relative mt-8 inline-flex items-center gap-2 rounded-full bg-[#202a40] px-5 py-3 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852]">{actionLabel} <ArrowRight size={14} /></button>
+    </div>
+  );
+}
+
 function QuizExperience({ words, allWords, modes, onBack, onFinish }: { words: EditableWord[]; allWords: EditableWord[]; modes: QuizMode[]; onBack: () => void; onFinish: () => void }) {
   const { t } = useLanguage();
   const [modeIndex, setModeIndex] = useState(0);
@@ -776,7 +800,7 @@ function QuizExperience({ words, allWords, modes, onBack, onFinish }: { words: E
   const mode = modes[modeIndex];
   const handleDone = () => { if (modeIndex === modes.length - 1) setComplete(true); else setModeIndex((current) => current + 1); };
   if (complete) {
-    return <section className="animate-rise mt-7" data-testid="panel-quiz-complete"><div className="rounded-[26px] border border-[#c9e2dc] bg-[#edf7f3] px-6 py-20 text-center shadow-[0_14px_34px_rgba(31,41,55,.06)]"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#24635f] text-[#f9f5e9]"><CheckCircle2 size={30} /></div><h2 className="mt-6 font-display text-[clamp(2.3rem,5vw,4rem)] leading-none tracking-[-.055em] text-[#202a40]">{t.quizComplete}</h2><p className="mx-auto mt-4 max-w-[390px] text-sm leading-relaxed text-[#5f675f]">{t.quizCompleteDescription}</p><button type="button" data-testid="button-finish-quiz" onClick={onFinish} className="mt-8 rounded-full bg-[#202a40] px-5 py-3 text-xs font-semibold text-[#f9f5e9]">{t.backToDay}</button></div></section>;
+    return <section className="animate-rise mt-7" data-testid="panel-quiz-complete"><CelebrationCard title={t.testCelebrationTitle} message={t.testCelebrationMessage} actionLabel={t.backToDay} actionTestId="button-finish-quiz" onAction={onFinish} /></section>;
   }
   return <section data-testid="panel-quiz-experience"><div className="mt-7 flex items-center justify-between gap-4"><button type="button" data-testid="button-quiz-back-to-selection" onClick={onBack} className="rounded-full border border-[#d6d1c6] bg-[#fbf8f1] px-3.5 py-2 text-xs font-semibold text-[#737970] hover:border-[#24635f] hover:text-[#24635f]"><ArrowLeft size={14} className="mr-1 inline" /> {t.quizModes}</button><span className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">{modeIndex + 1} / {modes.length}</span></div>{mode === 'word-building' && <WordBuildingGame words={words} onDone={handleDone} />}{mode === 'multiple-choice' && <MultipleChoiceGame words={words} allWords={allWords} onDone={handleDone} />}{mode === 'matching' && <MatchingGame words={words} onDone={handleDone} />}</section>;
 }
@@ -2079,14 +2103,7 @@ function AllDaysDetail({ dayNumber, words, reviewed, starred, onBack, onMarkRevi
               <QuizSelection words={words} reviewLaterIds={reviewLaterIds} selectedModes={selectedQuizModes} onToggleMode={toggleQuizMode} onStart={startQuiz} onBack={leaveFlashcardMode} />
             ) : sessionComplete && celebrationVisible ? (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#202a40]/45 px-5 backdrop-blur-sm" data-testid="panel-session-celebration">
-                <div className="animate-celebrate relative w-full max-w-[500px] overflow-hidden rounded-[30px] border border-[#c9e2dc] bg-[#edf7f3] px-7 py-14 text-center shadow-[0_24px_70px_rgba(31,41,55,.22)] sm:px-12">
-                  <div className="celebration-orbit celebration-orbit-one" />
-                  <div className="celebration-orbit celebration-orbit-two" />
-                  <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#24635f] text-[#f9f5e9] shadow-[0_0_0_10px_rgba(36,99,95,.08)]"><Sparkles size={28} /></div>
-                  <h2 className="relative mt-6 font-display text-[clamp(2.3rem,6vw,3.5rem)] leading-none tracking-[-.055em] text-[#202a40]">{t.dailySessionComplete}</h2>
-                  <p className="relative mx-auto mt-4 max-w-[340px] text-sm leading-relaxed text-[#5f675f]">{t.dailyWordsLeft(0)}</p>
-                  <button type="button" data-testid="button-continue-to-quiz" onClick={() => { setCelebrationVisible(false); setQuizSelectionVisible(true); }} className="relative mt-8 inline-flex items-center gap-2 rounded-full bg-[#202a40] px-5 py-3 text-xs font-semibold text-[#f9f5e9] transition-all hover:-translate-y-0.5 hover:bg-[#2c3852]">{t.continueToQuiz} <ArrowRight size={14} /></button>
-                </div>
+                <CelebrationCard title={t.studyCelebrationTitle} message={t.studyCelebrationMessage(words.length)} actionLabel={t.continueToQuiz} actionTestId="button-continue-to-quiz" onAction={() => { setCelebrationVisible(false); setQuizSelectionVisible(true); }} />
               </div>
             ) : currentWord && (
              <>

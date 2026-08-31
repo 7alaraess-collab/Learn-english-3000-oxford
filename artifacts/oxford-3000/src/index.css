@@ -78,6 +78,22 @@
   .flashcard-back { transform: rotateY(180deg); }
   .flashcard-panel { height: 100%; }
   .animate-celebrate { animation: celebrate .7s cubic-bezier(.2,.8,.2,1) both; }
+  .celebration-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .celebration-confetti span { position: absolute; top: -18px; left: 50%; width: 8px; height: 14px; border-radius: 2px; opacity: 0; animation: confetti-fall 1.35s ease-out 1 both; }
+  .celebration-confetti span:nth-child(1) { left: 8%; background: #f3d24f; --confetti-x: 42px; animation-delay: .05s; }
+  .celebration-confetti span:nth-child(2) { left: 17%; background: #ef7657; --confetti-x: -18px; animation-delay: .16s; }
+  .celebration-confetti span:nth-child(3) { left: 27%; background: #24635f; --confetti-x: 30px; animation-delay: .24s; }
+  .celebration-confetti span:nth-child(4) { left: 37%; background: #f3d24f; --confetti-x: -24px; animation-delay: .1s; }
+  .celebration-confetti span:nth-child(5) { left: 47%; background: #ef7657; --confetti-x: 16px; animation-delay: .3s; }
+  .celebration-confetti span:nth-child(6) { left: 57%; background: #24635f; --confetti-x: -34px; animation-delay: .18s; }
+  .celebration-confetti span:nth-child(7) { left: 67%; background: #f3d24f; --confetti-x: 28px; animation-delay: .34s; }
+  .celebration-confetti span:nth-child(8) { left: 77%; background: #ef7657; --confetti-x: -20px; animation-delay: .08s; }
+  .celebration-confetti span:nth-child(9) { left: 88%; background: #24635f; --confetti-x: 12px; animation-delay: .22s; }
+  .celebration-confetti span:nth-child(10) { left: 13%; background: #24635f; --confetti-x: 34px; animation-delay: .4s; }
+  .celebration-confetti span:nth-child(11) { left: 33%; background: #ef7657; --confetti-x: -14px; animation-delay: .47s; }
+  .celebration-confetti span:nth-child(12) { left: 63%; background: #f3d24f; --confetti-x: 24px; animation-delay: .43s; }
+  .celebration-confetti span:nth-child(13) { left: 82%; background: #24635f; --confetti-x: -28px; animation-delay: .52s; }
+  .celebration-confetti span:nth-child(14) { left: 93%; background: #ef7657; --confetti-x: 8px; animation-delay: .37s; }
   .celebration-orbit { position: absolute; border: 1px solid rgba(36,99,95,.15); border-radius: 999px; pointer-events: none; }
   .celebration-orbit-one { width: 320px; height: 320px; top: -150px; left: -130px; animation: orbit 7s ease-in-out infinite; }
   .celebration-orbit-two { width: 260px; height: 260px; right: -100px; bottom: -130px; animation: orbit 9s ease-in-out infinite reverse; }
@@ -94,9 +110,10 @@
   @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
   @keyframes cardFlip { from { opacity: .2; transform: rotateX(-7deg) scale(.985); } to { opacity: 1; transform: rotateX(0) scale(1); } }
   @keyframes celebrate { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @keyframes confetti-fall { 0% { opacity: 0; transform: translate3d(0, -10px, 0) rotate(0deg); } 12% { opacity: .95; } 100% { opacity: 0; transform: translate3d(var(--confetti-x), 235px, 0) rotate(540deg); } }
   @keyframes orbit { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(10px, 8px) rotate(7deg); } }
   @media (prefers-reduced-motion: reduce) {
-    .animate-rise, .animate-fade, .card-flip, .animate-celebrate, .celebration-orbit { animation: none !important; }
+    .animate-rise, .animate-fade, .card-flip, .animate-celebrate, .celebration-orbit, .celebration-confetti span { animation: none !important; }
     .flashcard-card { transition: none !important; }
   }
  }
