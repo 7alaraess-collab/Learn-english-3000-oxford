@@ -5,7 +5,7 @@ import { arSA } from '@clerk/localizations';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { getGetProgressQueryKey, useGetProgress, useSaveProgress, type ProgressInput, type TestResult } from '@workspace/api-client-react';
-import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, Command, Gamepad2, Layers3, Link2, ListFilter, Lock, Menu, Moon, Pencil, RotateCcw, Save, Search, Shuffle, Sparkles, SpellCheck, Star, Sun, Volume2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, Command, Flame, Gamepad2, Layers3, Link2, ListFilter, Lock, Menu, Moon, Pencil, RotateCcw, Save, Search, Shuffle, Sparkles, SpellCheck, Star, Sun, Volume2, X } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -80,6 +80,7 @@ const starredStorageKey = 'wordroom-starred';
 const currentDayStorageKey = 'wordroom-current-day';
 const currentWordStorageKey = 'wordroom-current-word';
 const testResultsStorageKey = 'wordroom-test-results';
+const lastVisitStorageKey = 'wordroom-last-visit';
 const dailyGoal = 12;
 const overridesStorageKey = 'wordroom-word-overrides';
 const themePreferenceStorageKey = 'wordroom-theme-preference';
@@ -144,7 +145,7 @@ const translations = {
     logout: 'Log out',
     syncedAccount: 'Synced account',
     loadingAccount: 'Loading account',
-    currentStreak: 'Current streak',
+    currentStreak: 'Daily streak',
     day: 'day',
     days: 'days',
     keepGoing: 'keep going',
@@ -154,6 +155,9 @@ const translations = {
     inThisView: 'In this view',
     matchingFilters: 'matching your filters',
     dailyWordsSession: "words in today's session",
+    welcomeBackTitle: 'Welcome back',
+    welcomeBackMessage: 'Your learning rhythm is waiting. Take a few minutes today to keep moving forward.',
+    dismissWelcomeBack: 'Dismiss welcome message',
     complete: 'Complete',
     learningDesk: 'Your learning desk',
     dashboardTitle: "A new day, new words.. ready for today's challenge?",
@@ -327,7 +331,7 @@ const translations = {
     logout: 'تسجيل الخروج',
     syncedAccount: 'حساب متزامن',
     loadingAccount: 'جارٍ تحميل الحساب',
-    currentStreak: 'السلسلة الحالية',
+    currentStreak: 'السلسلة اليومية',
     day: 'يوم',
     days: 'أيام',
     keepGoing: 'واصل التقدم',
@@ -337,6 +341,9 @@ const translations = {
     inThisView: 'في هذا العرض',
     matchingFilters: 'كلمة مطابقة للتصفية',
     dailyWordsSession: 'كلمة في جلسة اليوم',
+    welcomeBackTitle: 'مرحبًا بعودتك',
+    welcomeBackMessage: 'إيقاع تعلّمك بانتظارك. خصص بضع دقائق اليوم وواصل التقدم.',
+    dismissWelcomeBack: 'إغلاق رسالة الترحيب',
     complete: 'مكتمل',
     learningDesk: 'مساحتك التعليمية',
     dashboardTitle: 'يوم جديد، كلمات جديدة.. هل أنت مستعد لتحدي اليوم؟',
@@ -812,6 +819,23 @@ function localDateKey(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+function isDateKey(value: string | null): value is string {
+  return value !== null && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function dateDifferenceInDays(earlier: string, later: string) {
+  const [earlierYear, earlierMonth, earlierDay] = earlier.split('-').map(Number);
+  const [laterYear, laterMonth, laterDay] = later.split('-').map(Number);
+  const earlierUtc = Date.UTC(earlierYear, earlierMonth - 1, earlierDay);
+  const laterUtc = Date.UTC(laterYear, laterMonth - 1, laterDay);
+  return Math.round((laterUtc - earlierUtc) / 86400000);
+}
+
+function readLastVisitDate(userId?: string) {
+  const saved = window.localStorage.getItem(getStorageKey(lastVisitStorageKey, userId));
+  return isDateKey(saved) ? saved : null;
+}
+
 function getStorageKey(key: string, userId?: string) {
   return userId ? `${key}:${userId}` : key;
 }
@@ -933,23 +957,6 @@ function readWordOverrides() {
   }
 }
 
-function getCurrentStreak(completedDays: Set<number>) {
-  const orderedDays = [...completedDays].sort((a, b) => a - b);
-  let longestStreak = 0;
-  let currentStreak = 0;
-  let previousDay: number | undefined;
-
-  for (const dayNumber of orderedDays) {
-    currentStreak = previousDay !== undefined && dayNumber === previousDay + 1
-      ? currentStreak + 1
-      : 1;
-    longestStreak = Math.max(longestStreak, currentStreak);
-    previousDay = dayNumber;
-  }
-
-  return longestStreak;
-}
-
 function getCompletedDayNumbers(days: EditableWord[][], reviewed: Set<number>) {
   return days.reduce<number[]>((completed, dayWords, dayIndex) => {
     if (dayWords.length > 0 && dayWords.every((word) => reviewed.has(word.id))) {
@@ -970,6 +977,32 @@ function getTestCompletedDayNumbers(testResults: Record<string, SavedTestResult>
       return hasDailyTest && Number.isInteger(dayNumber) && dayNumber >= 1 && dayNumber <= curriculumDays ? dayNumber : null;
     })
     .filter((dayNumber): dayNumber is number => dayNumber !== null);
+}
+
+function getDailyTestActivityDates(testResults: Record<string, SavedTestResult>) {
+  return Object.entries(testResults).reduce<Set<string>>((dates, [key, result]) => {
+    if (!/^daily-\d+$/.test(key)) return dates;
+    const completedAt = new Date(result.completedAt);
+    if (!Number.isNaN(completedAt.getTime())) dates.add(localDateKey(completedAt));
+    return dates;
+  }, new Set<string>());
+}
+
+function getLastDailyTestDate(testResults: Record<string, SavedTestResult>) {
+  return [...getDailyTestActivityDates(testResults)].sort().at(-1) ?? null;
+}
+
+function getCurrentTestStreak(testResults: Record<string, SavedTestResult>, today: string) {
+  const activityDates = [...getDailyTestActivityDates(testResults)].sort();
+  const latestDate = activityDates.at(-1);
+  if (!latestDate || dateDifferenceInDays(latestDate, today) > 1) return 0;
+
+  let streak = 1;
+  for (let index = activityDates.length - 1; index > 0; index -= 1) {
+    if (dateDifferenceInDays(activityDates[index - 1], activityDates[index]) !== 1) break;
+    streak += 1;
+  }
+  return streak;
 }
 
 function getDayNumberForWordId(id: number) {
@@ -2204,6 +2237,8 @@ function Home() {
   const [testResults, setTestResults] = useState<Record<string, SavedTestResult>>(readTestResults);
   const [wordOverrides, setWordOverrides] = useState<Record<string, WordOverrides>>(readWordOverrides);
   const [blockedDay, setBlockedDay] = useState<number | null>(null);
+  const [previousVisitDate, setPreviousVisitDate] = useState<string | null>(() => readLastVisitDate());
+  const [welcomeBackDismissed, setWelcomeBackDismissed] = useState(false);
   const authUserRef = useRef<string | null | undefined>(undefined);
   const hydratedUserRef = useRef<string | null>(null);
   const resetProgressUserRef = useRef<string | null>(null);
@@ -2231,10 +2266,22 @@ function Home() {
     };
   }, [mobileOpen]);
   const today = localDateKey();
+  useEffect(() => {
+    if (!authLoaded) return;
+    const userId = isSignedIn ? user?.id : undefined;
+    setPreviousVisitDate(readLastVisitDate(userId));
+    window.localStorage.setItem(getStorageKey(lastVisitStorageKey, userId), today);
+    setWelcomeBackDismissed(false);
+  }, [authLoaded, isSignedIn, user?.id, today]);
   const reviewedToday = Object.values(reviewDates).filter((date) => date === today).length;
   const editableWords = useMemo(() => sourceWords.map((word) => ({ ...word, ...(wordOverrides[word.id] ?? {}) })), [wordOverrides]);
   const days = useMemo(() => splitIntoDays(editableWords), [editableWords]);
-  const currentStreak = getCurrentStreak(completedDays);
+  const currentStreak = getCurrentTestStreak(testResults, today);
+  const lastPracticeDate = getLastDailyTestDate(testResults);
+  const lastActiveDate = [lastPracticeDate, previousVisitDate].filter((date): date is string => date !== null).sort().at(-1) ?? null;
+  const showWelcomeBack = !welcomeBackDismissed
+    && lastActiveDate !== null
+    && dateDifferenceInDays(lastActiveDate, today) >= 1;
   useEffect(() => {
     if (!authLoaded) return;
     const userId = isSignedIn ? user?.id ?? null : null;
@@ -2525,6 +2572,16 @@ function Home() {
          </div>
        )}
        <main className="app-main ml-0 px-5 pb-16 pt-9 md:ml-[264px] md:px-10 md:pt-12">
+        {view === 'study' && showWelcomeBack && (
+          <div className="mx-auto mb-6 flex max-w-[1250px] items-start gap-3 rounded-2xl border border-[#e6c94d] bg-[#f5edda] px-4 py-3 text-[#202a40] shadow-[0_8px_22px_rgba(31,41,55,.05)]" role="status" data-testid="banner-welcome-back">
+            <Flame size={18} className="mt-0.5 shrink-0 text-[#ef7657]" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">{t.welcomeBackTitle}</p>
+              <p className="mt-1 text-sm leading-relaxed text-[#71776f]">{t.welcomeBackMessage}</p>
+            </div>
+            <button type="button" aria-label={t.dismissWelcomeBack} onClick={() => setWelcomeBackDismissed(true)} className="shrink-0 rounded-full p-1.5 text-[#858982] transition-colors hover:bg-[#e9e3d7] hover:text-[#202a40]"><X size={15} /></button>
+          </div>
+        )}
         <div className="mx-auto max-w-[1250px]">
           {view === 'all-days' ? (
              <AllDaysView days={days} reviewed={reviewed} starred={starred} completedDays={completedDays} reviewMilestones={reviewMilestones} selectedDayIndex={selectedDayIndex} onSelectDay={selectDay} onBlockedDay={blockedDayNotice} onBack={() => setSelectedDayIndex(null)} onMarkReviewed={markReviewed} onToggleStar={toggleStar} onSaveWord={saveWord} onCompleteTest={recordTestResult} onPositionChange={updatePosition} />
@@ -2536,7 +2593,7 @@ function Home() {
             <>
            <div className="animate-rise mb-9 flex flex-col justify-between gap-5 md:flex-row md:items-end">
               <div><div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.21em] text-[#24635f]"><span className="h-2 w-2 rounded-full bg-[#ef7657]" /> {t.learningDesk}</div><h1 className="mt-3 max-w-[620px] font-display text-[clamp(2.6rem,5.3vw,4.7rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-page">{view === 'study' ? t.dashboardTitle : <>{t.everyWordHasAPlace} <em className="text-[#24635f]">{t.place}</em></>}</h1><p className="mt-4 max-w-[470px] text-[14px] leading-relaxed text-[#71776f]">{view === 'study' ? t.dashboardSubtitle : t.browseDescription}</p></div>
-             <div className="flex items-center gap-2 text-right"><div><div className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">{t.currentStreak}</div><div className="mt-1 text-sm font-semibold text-[#202a40]">{currentStreak} {currentStreak === 1 ? t.day : t.days} <span className="ml-1 text-[#ef7657]">/</span> {currentStreak ? t.keepGoing : t.startToday}</div></div><div className="ml-2 flex h-11 w-11 items-center justify-center rounded-full border border-[#e6c94d] bg-[#f3d24f] font-display text-xl text-[#202a40]">{currentStreak}</div></div>
+             <div className="flex items-center gap-2 text-right"><div><div className="flex items-center justify-end gap-1 font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]"><Flame size={12} className="text-[#ef7657]" aria-hidden="true" />{t.currentStreak}</div><div className="mt-1 text-sm font-semibold text-[#202a40]">{currentStreak} {currentStreak === 1 ? t.day : t.days} <span className="ml-1 text-[#ef7657]">/</span> {currentStreak ? t.keepGoing : t.startToday}</div></div><div className="ml-2 flex h-11 w-11 items-center justify-center rounded-full border border-[#e6c94d] bg-[#f3d24f] font-display text-xl text-[#202a40]">{currentStreak}</div></div>
           </div>
              <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-3"><StatCard label={t.wordsMet} value={String(reviewed.size)} detail={t.wordsOfGoal} accent="bg-[#24635f]" /><StatCard label={t.inThisView} value={String(filteredWords.length)} detail={t.matchingFilters} accent="bg-[#ef7657]" /><StatCard label={t.dailyRhythm} value={`${Math.min(reviewedToday, dailyGoal)} / ${dailyGoal}`} detail={t.dailyWordsSession} accent="bg-[#f3d24f]" /></div>
           <Filters search={search} setSearch={setSearch} level={level} setLevel={setLevel} part={part} setPart={setPart} resultCount={filteredWords.length} />
