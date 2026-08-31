@@ -156,6 +156,8 @@ const translations = {
     dailyWordsSession: "words in today's session",
     complete: 'Complete',
     learningDesk: 'Your learning desk',
+    dashboardTitle: "A new day, new words.. ready for today's challenge?",
+    dashboardSubtitle: 'Start your learning journey now and build your confidence. Every test is a step forward.',
     betterEnglish: 'better English.',
     everyWordHasAPlace: 'Every word has a',
     place: 'place.',
@@ -333,6 +335,8 @@ const translations = {
     dailyWordsSession: 'كلمة في جلسة اليوم',
     complete: 'مكتمل',
     learningDesk: 'مساحتك التعليمية',
+    dashboardTitle: 'يوم جديد، كلمات جديدة.. هل أنت مستعد لتحدي اليوم؟',
+    dashboardSubtitle: 'ابدأ رحلة تعلمك الآن وابنِ ثقتك. كل اختبار هو خطوة إلى الأمام.',
     betterEnglish: 'إنجليزية أفضل.',
     everyWordHasAPlace: 'لكل كلمة',
     place: 'مكان.',
@@ -2514,7 +2518,7 @@ function Home() {
           ) : (
             <>
            <div className="animate-rise mb-9 flex flex-col justify-between gap-5 md:flex-row md:items-end">
-             <div><div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.21em] text-[#24635f]"><span className="h-2 w-2 rounded-full bg-[#ef7657]" /> {t.learningDesk}</div><h1 className="mt-3 max-w-[620px] font-display text-[clamp(2.6rem,5.3vw,4.7rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-page">{view === 'study' ? <>{language === 'ar' ? 'اصنع مساحة لـ' : 'Make room for '}<em className="text-[#24635f]">{t.betterEnglish}</em></> : <>{t.everyWordHasAPlace} <em className="text-[#24635f]">{t.place}</em></>}</h1><p className="mt-4 max-w-[470px] text-[14px] leading-relaxed text-[#71776f]">{view === 'study' ? t.studyDescription : t.browseDescription}</p></div>
+              <div><div className="flex items-center gap-2 font-mono-custom text-[10px] uppercase tracking-[.21em] text-[#24635f]"><span className="h-2 w-2 rounded-full bg-[#ef7657]" /> {t.learningDesk}</div><h1 className="mt-3 max-w-[620px] font-display text-[clamp(2.6rem,5.3vw,4.7rem)] leading-[.92] tracking-[-.065em] text-[#202a40]" data-testid="heading-page">{view === 'study' ? t.dashboardTitle : <>{t.everyWordHasAPlace} <em className="text-[#24635f]">{t.place}</em></>}</h1><p className="mt-4 max-w-[470px] text-[14px] leading-relaxed text-[#71776f]">{view === 'study' ? t.dashboardSubtitle : t.browseDescription}</p></div>
              <div className="flex items-center gap-2 text-right"><div><div className="font-mono-custom text-[10px] uppercase tracking-[.15em] text-[#858982]">{t.currentStreak}</div><div className="mt-1 text-sm font-semibold text-[#202a40]">{currentStreak} {currentStreak === 1 ? t.day : t.days} <span className="ml-1 text-[#ef7657]">/</span> {currentStreak ? t.keepGoing : t.startToday}</div></div><div className="ml-2 flex h-11 w-11 items-center justify-center rounded-full border border-[#e6c94d] bg-[#f3d24f] font-display text-xl text-[#202a40]">{currentStreak}</div></div>
           </div>
              <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-3"><StatCard label={t.wordsMet} value={String(reviewed.size)} detail={t.wordsOfGoal} accent="bg-[#24635f]" /><StatCard label={t.inThisView} value={String(filteredWords.length)} detail={t.matchingFilters} accent="bg-[#ef7657]" /><StatCard label={t.dailyRhythm} value={`${Math.min(reviewedToday, dailyGoal)} / ${dailyGoal}`} detail={t.dailyWordsSession} accent="bg-[#f3d24f]" /></div>
