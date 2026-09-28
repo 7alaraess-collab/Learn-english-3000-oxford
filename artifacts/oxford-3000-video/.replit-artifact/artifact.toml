@@ -1,0 +1,29 @@
+videoAspectRatio = "16:9"
+kind = "video"
+previewPath = "/oxford-3000-video/"
+title = "Oxford 3000 — Animated Overview"
+description = "A short animated product story introducing the Oxford 3000 vocabulary learning experience, its Arabic-friendly study flow, daily word sets, and milestone reviews."
+version = "1.0.0"
+id = "artifacts/oxford-3000-video"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/oxford-3000-video/" ]
+localPort = 24458
+
+[services.development]
+run = "pnpm --filter @workspace/oxford-3000-video run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/oxford-3000-video", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/oxford-3000-video/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24458"
+BASE_PATH = "/oxford-3000-video/"
